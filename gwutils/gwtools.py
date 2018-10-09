@@ -167,14 +167,17 @@ def restrict_data(data, interval):
                 iend += 1
         return data[ibeg:iend+1]
 # Trim zeros from a waveform according to chosen columns
-def trim_zeros(data, cols):
+def trim_zeros(data, cols, ifallzero_returnvoid=False):
     ilastnonzero = len(data)-1
-    while all([data[ilastnonzero, i]==0. for i in cols]):
+    while (ilastnonzero>=0) and all([data[ilastnonzero, i]==0. for i in cols]):
         ilastnonzero -= 1
     ifirstnonzero = 0
-    while all([data[ifirstnonzero, i]==0. for i in cols]):
+    while (ifirstnonzero<=len(data)-1) and all([data[ifirstnonzero, i]==0. for i in cols]):
         ifirstnonzero += 1
-    return data[ifirstnonzero:ilastnonzero+1]
+    if ifirstnonzero>ilastnonzero and not ifallzero_returnvoid: # if everything is zero, do nothing
+        return data
+    else:
+        return data[ifirstnonzero:ilastnonzero+1]
 
 # Integration with the discrete trapeze rule
 def integrate_trapeze(data):
