@@ -565,18 +565,18 @@ plt.rcParams.update(rc_params)
 
 plotpalette = ["#4C72B0", "#C44E52", "#CCB974", "#55A868", "#8172B2", "#64B5CD"]
 def lplot(ax, *args, **kwargs):
-    rangex = kwargs.get('rangex', [])
-    rangey = kwargs.get('rangey', [])
-    ds = kwargs.get('downsample', 1)
-    size = kwargs.get('figsize', (8, 4))
-    grid = kwargs.get('grid', True)
-    colormap = kwargs.get('colormap', None)
-    colormapbounds = kwargs.get('colormapbounds', [0.,1.])
-    colors = kwargs.get('colors', None)
-    linestyles = kwargs.get('linestyles', None)
-    linewidths = kwargs.get('linewidths', None)
-    log_xscale = kwargs.get('log_xscale', False)
-    log_yscale = kwargs.get('log_yscale', False)
+    rangex = kwargs.pop('rangex', [])
+    rangey = kwargs.pop('rangey', [])
+    ds = kwargs.pop('downsample', 1)
+    size = kwargs.pop('figsize', (8, 4))
+    grid = kwargs.pop('grid', True)
+    colormap = kwargs.pop('colormap', None)
+    colormapbounds = kwargs.pop('colormapbounds', [0.,1.])
+    colors = kwargs.pop('colors', None)
+    linestyles = kwargs.pop('linestyles', None)
+    linewidths = kwargs.pop('linewidths', None)
+    log_xscale = kwargs.pop('log_xscale', False)
+    log_yscale = kwargs.pop('log_yscale', False)
     n = len(args)
     if colors is None: # colors option supersedes colormap
         if colormap is not None:
@@ -616,7 +616,7 @@ def lplot(ax, *args, **kwargs):
         minyvals[i] = min(data[:, col2])
         maxyvals[i] = max(data[:, col2])
         avyvals[i] = np.average(data[:, col2])
-        ax.plot(data[:,col1], data[:,col2], color=colors[i], linestyle=linestyles[i], linewidth=linewidths[i])
+        ax.plot(data[:,col1], data[:,col2], color=colors[i], linestyle=linestyles[i], linewidth=linewidths[i], **kwargs)
     if rangex:
         ax.set_xlim(rangex[0], rangex[1])
     else:
