@@ -167,7 +167,7 @@ def restrict_data(data, interval):
                 iend += 1
         return data[ibeg:iend+1]
 # Trim zeros from a waveform according to chosen columns
-def trim_zeros(data, cols, ifallzero_returnvoid=False):
+def trim_zeros_bycol(data, cols, ifallzero_returnvoid=False):
     ilastnonzero = len(data)-1
     while (ilastnonzero>=0) and all([data[ilastnonzero, i]==0. for i in cols]):
         ilastnonzero -= 1
