@@ -141,6 +141,8 @@ def unwrap_mod(p, mod=2*np.pi, axis=-1):
     return up
 
 # Restrict data to an interval according to first column
+# If data[:,0]=x and interval=[a,b], selects data such that a<=x<=b
+# Typically results in data being entirely inside interval
 def restrict_data(data, interval):
     if not interval: # test if interval==[]
         return data
@@ -162,6 +164,34 @@ def restrict_data(data, interval):
         else:
             iend = n-1 - min(int((x[-1] - interval[-1]) / deltax), n-1)
             while iend > 0 and x[iend] > interval[-1]:
+                iend -= 1
+            while iend < n-1 and x[iend+1] < interval[-1]:
+                iend += 1
+        return data[ibeg:iend+1]
+# Restrict data to an interval according to first column
+# If data[:,0]=x and interval=[a,b], selects data from the last point such that x<=a to the first point such that b<=x
+# Typically results in interval being entirely covered by data
+def restrict_data_soft(data, interval):
+    if not interval: # test if interval==[]
+        return data
+    else:
+        # Make an initial guess based on global length - then adjust starting and ending indices
+        x = data[:,0]
+        n = len(data)
+        deltax = (x[-1] - x[0]) / n
+        if interval[0] < x[0]:
+            ibeg = 0
+        else:
+            ibeg = min(int((interval[0]-x[0]) / deltax), n-1)
+            while ibeg < n-1 and x[ibeg+1] <= interval[0]:
+                ibeg += 1
+            while ibeg > 0 and x[ibeg] > interval[0]:
+                ibeg -= 1
+        if interval[-1] > x[-1]:
+            iend = n-1
+        else:
+            iend = n-1 - min(int((x[-1] - interval[-1]) / deltax), n-1)
+            while iend > 0 and x[iend-1] >= interval[-1]:
                 iend -= 1
             while iend < n-1 and x[iend+1] < interval[-1]:
                 iend += 1
@@ -601,10 +631,10 @@ def lplot(ax, *args, **kwargs):
     avyvals = np.zeros(n)
     for i, x in enumerate(args):
         if type(x[1]) is np.ndarray:
-            data = restrict_data(np.array([x[0][::ds], x[1][::ds]]).T, rangex)
+            data = restrict_data_soft(np.array([x[0][::ds], x[1][::ds]]).T, rangex)
             col1, col2 = [0, 1]
         else:
-            data = restrict_data(x[0][::ds], rangex)
+            data = restrict_data_soft(x[0][::ds], rangex)
             col1, col2 = x[1]
         if not (log_xscale and log_yscale):
             minxvals[i] = data[0, col1]

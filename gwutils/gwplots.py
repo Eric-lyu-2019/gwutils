@@ -743,6 +743,11 @@ def convert_params_Lframe(x):
 def convert_post_Lframe(posterior):
     return np.array(map(lambda x: convert_params_Lframe(x), posterior))
 
+# Functions to parse a bambi .out file
+# Extract evolution of evidence and acceptance rate with the number of evaluations
+# def parse_bambi_outputfile():
+#     pass
+
 # Functions to parse a _params.txt file, extracting injected parameters
 def linematchingsymbol(stringarr, symbol):
     stringarrmatch = filter(lambda x: re.match(r"^ *" + re.escape(symbol) + r" *:", x) is not None, stringarr)
