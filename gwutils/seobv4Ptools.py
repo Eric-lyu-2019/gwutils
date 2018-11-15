@@ -319,7 +319,7 @@ def gen_SEOBNRv4Pold(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0.
 #-------------------------------------------------------------------------------
 # SEOBNRv4P
 # Note: default Mf_sampling corresponds to 4096Hz, 50Msol
-def gen_SEOBNRv4P(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0., Mf_sampling=default_Mf_sampling, version_spinaligned='v4', flags_v4P=None):
+def gen_SEOBNRv4P(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0., Mf_sampling=default_Mf_sampling, version_spinaligned='v4', flags_v4P=None, include_flag_v4P_constSampling=False):
 
     # Arbitrary mass, distance
     M = 50. # in solar masses
@@ -349,7 +349,10 @@ def gen_SEOBNRv4P(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., p
         flagSamplingInspiral = 0
     else:
         #print flags_v4P
-        flagHamiltonianDerivative, flagEulerextension, flagZframe, flagSamplingInspiral = flags_v4P
+        if not include_flag_v4P_constSampling:
+            flagHamiltonianDerivative, flagEulerextension, flagZframe, flagSamplingInspiral = flags_v4P
+        else:
+            flagHamiltonianDerivative, flagEulerextension, flagZframe = flags_v4P
 
     # Version of the Hamiltonian, flux/waveform, NQC to be used
     flag_version_spinaligned = 0
@@ -363,7 +366,11 @@ def gen_SEOBNRv4P(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., p
     #return (phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, flagHamiltonianDerivative, flagEulerextension, flagZframe)
 
     # Generate SEOBNRv4P, collect data pieces
-    hplus, hcross, hIlm, hJlm, seobdynamicsAdaSVector, seobdynamicsHiSVector, seobdynamicsAdaSHiSVector, tVecPmodes, hP22_amp, hP22_phase, hP21_amp, hP21_phase, alphaJ2P, betaJ2P, gammaJ2P, mergerParams = lalsim.SimIMRSpinPrecEOBWaveformAll_new(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, flag_version_spinaligned, flagHamiltonianDerivative, flagEulerextension, flagZframe, flagSamplingInspiral)
+    # We allow for two interfaces, with and without flagSamplingInspiral - to be cleaned up
+    if not include_flag_v4P_constSampling:
+        hplus, hcross, hIlm, hJlm, seobdynamicsAdaSVector, seobdynamicsHiSVector, seobdynamicsAdaSHiSVector, tVecPmodes, hP22_amp, hP22_phase, hP21_amp, hP21_phase, alphaJ2P, betaJ2P, gammaJ2P, mergerParams = lalsim.SimIMRSpinPrecEOBWaveformAll_new(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, flag_version_spinaligned, flagHamiltonianDerivative, flagEulerextension, flagZframe)
+    else:
+        hplus, hcross, hIlm, hJlm, seobdynamicsAdaSVector, seobdynamicsHiSVector, seobdynamicsAdaSHiSVector, tVecPmodes, hP22_amp, hP22_phase, hP21_amp, hP21_phase, alphaJ2P, betaJ2P, gammaJ2P, mergerParams = lalsim.SimIMRSpinPrecEOBWaveformAll_new(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, flag_version_spinaligned, flagHamiltonianDerivative, flagEulerextension, flagZframe, flagSamplingInspiral)
 
     # Output dictionary - the set of keys will differ for v3, v4P_old, v4P
     res = {}
