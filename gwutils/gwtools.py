@@ -1,6 +1,7 @@
 ## General tools
 
 import sys
+from os import path
 import re
 import time
 import numpy as np
@@ -41,12 +42,14 @@ Omega = 1.99098659277e-7 # Orbital pulsation: 2pi/year - use sidereal year as fo
 L = 2.5e9 # Arm length of the detector (in m): (L3 reference LISA)
 R = 1.4959787066e11 # Radius of the orbit around the sun: 1AU
 
+
 # Loading QNM
 # Source : https://centra.tecnico.ulisboa.pt/network/grit/files/ringdown/
+resources_dir = path.join(path.dirname(__file__), 'data/')
 QNMlmndata = {}
-QNMlmndata[(2,2,0)] = np.loadtxt('data/QNM/QNMl2/n1l2m2.dat')
-QNMlmndata[(2,1,0)] = np.loadtxt('data/QNM/QNMl2/n1l2m1.dat')
-QNMlmndata[(2,0,0)] = np.loadtxt('data/QNM/QNMl2/n1l2m0.dat')
+QNMlmndata[(2,2,0)] = np.loadtxt(resources_dir+'QNM/QNMl2/n1l2m2.dat')
+QNMlmndata[(2,1,0)] = np.loadtxt(resources_dir+'QNM/QNMl2/n1l2m1.dat')
+QNMlmndata[(2,0,0)] = np.loadtxt(resources_dir+'QNM/QNMl2/n1l2m0.dat')
 QNMomegalmnInt = {}
 QNMsigmalmnInt = {}
 QNMomegalmnInt[(2,2,0)] = ip.InterpolatedUnivariateSpline(QNMlmndata[(2,2,0)][:,0], QNMlmndata[(2,2,0)][:,1], k=3)
