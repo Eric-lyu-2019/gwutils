@@ -41,11 +41,12 @@ Omega = 1.99098659277e-7 # Orbital pulsation: 2pi/year - use sidereal year as fo
 L = 2.5e9 # Arm length of the detector (in m): (L3 reference LISA)
 R = 1.4959787066e11 # Radius of the orbit around the sun: 1AU
 
-# Loading QNM - NOT PORTABLE - requires to have the data copied separately and the path adjusted
+# Loading QNM
+# Source : https://centra.tecnico.ulisboa.pt/network/grit/files/ringdown/
 QNMlmndata = {}
-QNMlmndata[(2,2,0)] = np.loadtxt('/Users/marsat/Data/QNM/QNMl2/n1l2m2.dat')
-QNMlmndata[(2,1,0)] = np.loadtxt('/Users/marsat/Data/QNM/QNMl2/n1l2m1.dat')
-QNMlmndata[(2,0,0)] = np.loadtxt('/Users/marsat/Data/QNM/QNMl2/n1l2m0.dat')
+QNMlmndata[(2,2,0)] = np.loadtxt('data/QNM/QNMl2/n1l2m2.dat')
+QNMlmndata[(2,1,0)] = np.loadtxt('data/QNM/QNMl2/n1l2m1.dat')
+QNMlmndata[(2,0,0)] = np.loadtxt('data/QNM/QNMl2/n1l2m0.dat')
 QNMomegalmnInt = {}
 QNMsigmalmnInt = {}
 QNMomegalmnInt[(2,2,0)] = ip.InterpolatedUnivariateSpline(QNMlmndata[(2,2,0)][:,0], QNMlmndata[(2,2,0)][:,1], k=3)
@@ -139,6 +140,116 @@ def unwrap_mod(p, mod=2*np.pi, axis=-1):
     up = np.array(p, copy=True, dtype='d')
     up[slice1] = p[slice1] + ph_correct.cumsum(axis)
     return up
+
+################################################################################
+# Functions for the L-frame conversion for LISA
+
+# Conversions between SSB-frame and L-frame parameters (for initial position alpha=0)
+def functLfromtSSB(tSSB, lambd, beta):
+    return tSSB - R/c*cos(beta)*cos(Omega*tSSB - lambd)
+def functSSBfromtL(tL, lambd, beta):
+    return tL + R/c*cos(beta)*cos(Omega*tL - lambd) - 1./2*Omega*(R/c*cos(beta))**2*sin(2.*(Omega*tL - lambd))
+def funcphiL(m1, m2, t, phi): # note: mod to [0,2pi]
+    MfROMmax22 = 0.14
+    fRef = MfROMmax22/((m1 + m2)*msols)
+    return mod2pi(-phi + pi*t*fRef)
+# NOTE: simple relation between L-frame definitions
+# lambdaL_old = lambdaL_paper - pi/2
+def funclambdaL(lambd, beta, defLframe='paper'):
+    if defLframe=='paper':
+        return arctan2(cos(beta)*sin(lambd), cos(beta)*cos(lambd)*cos(pi/3) + sin(beta)*sin(pi/3))
+    elif defLframe=='old':
+        return -arctan2(cos(beta)*cos(lambd)*cos(pi/3) + sin(beta)*sin(pi/3), cos(beta)*sin(lambd))
+    else:
+        raise ValueError('Value %s for defLframe is not recognized.' % defLframe)
+def funcbetaL(lambd, beta):
+    return -arcsin(cos(beta)*cos(lambd)*sin(pi/3) - sin(beta)*cos(pi/3))
+# NOTE: old equivalent writing
+# modpi(arctan2(cos(pi/3)*cos(beta)*sin(psi) - sin(pi/3)*(sin(lambd)*cos(psi) - cos(lambd)*sin(beta)*sin(psi)), cos(pi/3)*cos(beta)*cos(psi) + sin(pi/3)*(sin(lambd)*sin(psi) + cos(lambd)*sin(beta)*cos(psi))))
+def funcpsiL(lambd, beta, psi): # note: mod to [0,pi]
+    return modpi(psi + arctan2(-sin(pi/3)*sin(lambd), cos(pi/3)*cos(beta) + sin(pi/3)*cos(lambd)*sin(beta)))
+
+# Derivatives of L-frame parameters with respect to SSB-frame parameters
+# tL
+def funcdtLdtSSB(tSSB, lambd, beta):
+    return 1 + R/c*cos(beta) * Omega*sin(Omega*tSSB - lambd)
+def funcdtLdlambda(tSSB, lambd, beta):
+    return R/c*cos(beta)*sin(Omega*tSSB - lambd)
+def funcdtLdbeta(tSSB, lambd, beta):
+    return R/c*sin(beta)*cos(Omega*tSSB - lambd)
+# phiL
+def funcdphiLdm1(m1, m2, t, phi):
+    MfROMmax22 = 0.14
+    dfRefdm1 = -MfROMmax22/((m1 + m2)**2 * msols)
+    return pi*t*dfRefdm1
+def funcdphiLdm2(m1, m2, t, phi):
+    MfROMmax22 = 0.14
+    dfRefdm2 = -MfROMmax22/((m1 + m2)**2 * msols)
+    return pi*t*dfRefdm2
+def funcdphiLdt(m1, m2, t, phi):
+    MfROMmax22 = 0.14
+    fRef = MfROMmax22/((m1 + m2)*msols)
+    return pi*fRef
+def funcdphiLdphi(m1, m2, t, phi):
+    return -1
+# lambdaL
+# NOTE: derivative identical for different L-frame conventions that differ by a constant shift in lambdaL
+def funcdlambdaLdlambda(lambd, beta):
+    return (cos(beta)*(cos(beta)*cos(pi/3) + cos(lambd)*sin(beta)*sin(pi/3))) / ((cos(beta)*cos(pi/3)*cos(lambd) + sin(beta)*sin(pi/3))**2 +
+ cos(beta)**2 * sin(lambd)**2)
+def funcdlambdaLdbeta(lambd, beta):
+    return -((sin(pi/3)*sin(lambd))/((cos(beta)*cos(pi/3)*cos(lambd) + sin(beta)*sin(pi/3))**2 +
+  cos(beta)**2*sin(lambd)**2))
+# betaL
+def funcdbetaLdlambda(lambd, beta):
+    return -cos(beta)*sin(pi/3)*sin(lambd) / np.sqrt(1 - (cos(pi/3)*sin(beta) - cos(beta)*cos(lambd)*sin(pi/3))**2)
+def funcdbetaLdbeta(lambd, beta):
+    return (-cos(beta)*cos(pi/3) - cos(lambd)*sin(beta)*sin(pi/3)) / np.sqrt(1 - (cos(pi/3)*sin(beta) - cos(beta)*cos(lambd)*sin(pi/3))**2)
+# psiL
+def funcdpsiLdlambda(lambd, beta, psi):
+    return -((sin(pi/3)*(cos(beta)*cos(pi/3)*cos(lambd) + sin(beta)*sin(pi/3))) / ((cos(beta)*cos(pi/3) + cos(lambd)*sin(beta)*sin(pi/3))**2 + sin(pi/3)**2 * sin(lambd)**2))
+def funcdpsiLdbeta(lambd, beta, psi):
+    return (sin(pi/3)*(-cos(pi/3)*sin(beta) + cos(beta)*cos(lambd)*sin(pi/3))*sin(lambd)) / ((cos(beta)*cos(pi/3) + cos(lambd)*sin(beta)*sin(pi/3))**2 +
+ sin(pi/3)**2 * sin(lambd)**2)
+def funcdpsiLdpsi(lambd, beta, psi):
+    return 1.
+# Jacobian matrix of the SSB-Lframe transformation
+# Required to convert Fisher matrices computed with SSB params to L-frame params
+# Parameters order : m1 m2 t D phi inc lambda beta psi
+# Matrix Jij = \partial xLi / \partial xj
+def funcJacobianSSBtoLframe(params):
+    m1, m2, t, D, phi, inc, lambd, beta, psi = params
+    J = np.zeros((9,9), dtype=float)
+    # m1
+    J[0,0] = 1.
+    # m2
+    J[1,1] = 1.
+    # tL
+    J[2,2] = funcdtLdtSSB(t, lambd, beta)
+    J[2,6] = funcdtLdlambda(t, lambd, beta)
+    J[2,7] = funcdtLdbeta(t, lambd, beta)
+    # D
+    J[3,3] = 1.
+    # phiL
+    J[4,0] = funcdphiLdm1(m1, m2, t, phi)
+    J[4,1] = funcdphiLdm2(m1, m2, t, phi)
+    J[4,2] = funcdphiLdt(m1, m2, t, phi)
+    J[4,4] = funcdphiLdphi(m1, m2, t, phi)
+    # inc
+    J[5,5] = 1.
+    # lambdaL
+    J[6,6] = funcdlambdaLdlambda(lambd, beta)
+    J[6,7] = funcdlambdaLdbeta(lambd, beta)
+    # betaL
+    J[7,6] = funcdbetaLdlambda(lambd, beta)
+    J[7,7] = funcdbetaLdbeta(lambd, beta)
+    # psiL
+    J[8,6] = funcdpsiLdlambda(lambd, beta, psi)
+    J[8,7] = funcdpsiLdbeta(lambd, beta, psi)
+    J[8,8] = funcdpsiLdpsi(lambd, beta, psi)
+    return J
+
+################################################################################
 
 # Restrict data to an interval according to first column
 # If data[:,0]=x and interval=[a,b], selects data such that a<=x<=b
@@ -557,6 +668,7 @@ def fold_list(xlist, n):
     l = len(xlist)
     return (xlist * (n//l + 1))[:n]
 
+################################################################################
 # Functions to plot arrays
 # Input format :
 # ax axes object (for subplot use)
@@ -682,6 +794,8 @@ def lloglinearplot(ax, *arg, **kwargs):
 def lloglogplot(ax, *arg, **kwargs):
     args = (ax,) + arg
     return lplot(*args, log_xscale=True, log_yscale=True, **kwargs)
+
+################################################################################
 
 # Sort array by column
 # - for instance, sort posterior samples according to LogLikelihood value

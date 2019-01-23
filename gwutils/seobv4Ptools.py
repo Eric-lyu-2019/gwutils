@@ -104,6 +104,20 @@ def find_omegapeak(t, omega, tmin=None, tmax=None):
     return [scalefactor * (res.x[0]), -res.fun]
 
 #-------------------------------------------------------------------------------
+# Utilities for lists of modes (l,m)
+def func_lvalues(listmodes):
+    lvalues = []
+    for lm in listmodes:
+        if not lm[0] in lvalues:
+            lvalues += [lm[0]]
+    return lvalues
+def func_allmodes_lvalues(lvalues):
+    modes = []
+    for l in lvalues:
+        modes += [(l, l-m) for m in range(2*l+1)]
+    return modes
+
+#-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 # Waveform generation wrappers
 #-------------------------------------------------------------------------------
@@ -268,53 +282,53 @@ def gen_SEOBNRv3(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., ph
 #-------------------------------------------------------------------------------
 # SEOBNRv4 pre-code rewrite
 # Note: default Mf_sampling corresponds to 4096Hz, 50Msol
-def gen_SEOBNRv4Pold(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0., Mf_sampling=default_Mf_sampling):
-
-    # Arbitrary mass, distance
-    M = 50. # in solar masses
-    dist = 1. # in Mpc
-
-    # Masses in solar masses
-    m1 = M * q/(1.0+q)
-    m2 = M * 1.0/(1.0+q)
-
-    # SI units
-    distSI = dist * 1e6 * lal.PC_SI
-    m1SI = m1 * lal.MSUN_SI
-    m2SI = m2 * lal.MSUN_SI
-    f_sampling = Mf_sampling / (M*lal.MTSUN_SI)
-    deltaT = 1./f_sampling
-    f_min = Mf_min / (M*lal.MTSUN_SI)
-
-    # Prefactors to adimension h and t
-    prefactor_h = 1. # the modes hIlm are adimensioned
-    prefactor_t = 1./(M*lal.MTSUN_SI)
-
-    # For old syntax, even though we are using v4
-    PrecEOBversion = 3
-
-    # Set the Euler extension to the simple-precession extension
-    flagEulerextension = 1
-
-    # Generate the older version of SEOBNRv4P, collect data pieces
-    hplus, hcross, dynamics, hPinsp, hPinspHi, hJinspHi, hIIMR, AttachPars = lalsim.SimIMRSpinPrecEOBWaveformAll(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, PrecEOBversion, flagEulerextension)
-
-    # Output dictionary - the set of keys will differ for v3, v4P_old, v4P
-    res = {}
-    res['hp'] = hp
-    res['hc'] = hc
-    res['dynamics'] = dynamics
-    res['hPinsp'] = hPinsp
-    res['hPinspHi'] = hPinspHi
-    res['hJinspHi'] = hJinspHi
-    res['hJinspHi'] = hJinspHi
-    res['hIIMR'] = hIIMR
-    res['AttachPars'] = AttachPars
-    # We save also the prefactors for adimensioned time and strain
-    res['prefact_t'] = prefactor_t
-    res['prefact_h'] = prefactor_h
-
-    return res
+# def gen_SEOBNRv4Pold(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0., Mf_sampling=default_Mf_sampling):
+#
+#     # Arbitrary mass, distance
+#     M = 50. # in solar masses
+#     dist = 1. # in Mpc
+#
+#     # Masses in solar masses
+#     m1 = M * q/(1.0+q)
+#     m2 = M * 1.0/(1.0+q)
+#
+#     # SI units
+#     distSI = dist * 1e6 * lal.PC_SI
+#     m1SI = m1 * lal.MSUN_SI
+#     m2SI = m2 * lal.MSUN_SI
+#     f_sampling = Mf_sampling / (M*lal.MTSUN_SI)
+#     deltaT = 1./f_sampling
+#     f_min = Mf_min / (M*lal.MTSUN_SI)
+#
+#     # Prefactors to adimension h and t
+#     prefactor_h = 1. # the modes hIlm are adimensioned
+#     prefactor_t = 1./(M*lal.MTSUN_SI)
+#
+#     # For old syntax, even though we are using v4
+#     PrecEOBversion = 3
+#
+#     # Set the Euler extension to the simple-precession extension
+#     flagEulerextension = 1
+#
+#     # Generate the older version of SEOBNRv4P, collect data pieces
+#     hplus, hcross, dynamics, hPinsp, hPinspHi, hJinspHi, hIIMR, AttachPars = lalsim.SimIMRSpinPrecEOBWaveformAll(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, PrecEOBversion, flagEulerextension)
+#
+#     # Output dictionary - the set of keys will differ for v3, v4P_old, v4P
+#     res = {}
+#     res['hp'] = hp
+#     res['hc'] = hc
+#     res['dynamics'] = dynamics
+#     res['hPinsp'] = hPinsp
+#     res['hPinspHi'] = hPinspHi
+#     res['hJinspHi'] = hJinspHi
+#     res['hJinspHi'] = hJinspHi
+#     res['hIIMR'] = hIIMR
+#     res['AttachPars'] = AttachPars
+#     # We save also the prefactors for adimensioned time and strain
+#     res['prefact_t'] = prefactor_t
+#     res['prefact_h'] = prefactor_h
+#
+#     return res
 
 #-------------------------------------------------------------------------------
 # SEOBNRv4P
@@ -368,9 +382,9 @@ def gen_SEOBNRv4P(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., p
     # Generate SEOBNRv4P, collect data pieces
     # We allow for two interfaces, with and without flagSamplingInspiral - to be cleaned up
     if not include_flag_v4P_constSampling:
-        hplus, hcross, hIlm, hJlm, seobdynamicsAdaSVector, seobdynamicsHiSVector, seobdynamicsAdaSHiSVector, tVecPmodes, hP22_amp, hP22_phase, hP21_amp, hP21_phase, alphaJ2P, betaJ2P, gammaJ2P, mergerParams = lalsim.SimIMRSpinPrecEOBWaveformAll_new(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, flag_version_spinaligned, flagHamiltonianDerivative, flagEulerextension, flagZframe)
+        hplus, hcross, hIlm, hJlm, seobdynamicsAdaSVector, seobdynamicsHiSVector, seobdynamicsAdaSHiSVector, tVecPmodes, hP22_amp, hP22_phase, hP21_amp, hP21_phase, alphaJ2P, betaJ2P, gammaJ2P, mergerParams = lalsim.SimIMRSpinPrecEOBWaveformAll(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, flag_version_spinaligned, flagHamiltonianDerivative, flagEulerextension, flagZframe)
     else:
-        hplus, hcross, hIlm, hJlm, seobdynamicsAdaSVector, seobdynamicsHiSVector, seobdynamicsAdaSHiSVector, tVecPmodes, hP22_amp, hP22_phase, hP21_amp, hP21_phase, alphaJ2P, betaJ2P, gammaJ2P, mergerParams = lalsim.SimIMRSpinPrecEOBWaveformAll_new(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, flag_version_spinaligned, flagHamiltonianDerivative, flagEulerextension, flagZframe, flagSamplingInspiral)
+        hplus, hcross, hIlm, hJlm, seobdynamicsAdaSVector, seobdynamicsHiSVector, seobdynamicsAdaSHiSVector, tVecPmodes, hP22_amp, hP22_phase, hP21_amp, hP21_phase, alphaJ2P, betaJ2P, gammaJ2P, mergerParams = lalsim.SimIMRSpinPrecEOBWaveformAll(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, flag_version_spinaligned, flagHamiltonianDerivative, flagEulerextension, flagZframe, flagSamplingInspiral)
 
     # Output dictionary - the set of keys will differ for v3, v4P_old, v4P
     res = {}
@@ -386,6 +400,97 @@ def gen_SEOBNRv4P(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., p
     res['hP22_phase'] = hP22_phase
     res['hP21_amp'] = hP21_amp
     res['hP21_phase'] = hP21_phase
+    res['alphaJ2P'] = alphaJ2P
+    res['betaJ2P'] = betaJ2P
+    res['gammaJ2P'] = gammaJ2P
+    res['mergerParams'] = mergerParams
+    # We save also the prefactors for adimensioned time and strain
+    res['prefact_t'] = prefactor_t
+    res['prefact_h'] = prefactor_h
+
+    return res
+
+#-------------------------------------------------------------------------------
+# SEOBNRv4PHM
+# Note: default Mf_sampling corresponds to 4096Hz, 50Msol
+def gen_SEOBNRv4PHM(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0., Mf_sampling=default_Mf_sampling, version_spinaligned='v4', flags_v4P=None, PframeModes='All', flag_sym=True):
+
+    # Set of modes to be generated in the P-frame
+    if PframeModes=='All':
+        Pmodes = [(2,2), (2,1), (3,3), (4,4), (5,5)]
+    else:
+        Pmodes = PframeModes
+    modearray = lalsim.SimInspiralCreateModeArray();
+    for lm in Pmodes:
+        lalsim.SimInspiralModeArrayActivateMode(modearray, lm[0], lm[1]);
+    #lalsim.SimInspiralModeArrayPrintModes(modearray)
+
+    # Arbitrary mass, distance
+    M = 50. # in solar masses
+    dist = 1. # in Mpc
+
+    # Masses in solar masses
+    m1 = M * q/(1.0+q)
+    m2 = M * 1.0/(1.0+q)
+
+    # SI units
+    distSI = dist * 1e6 * lal.PC_SI
+    m1SI = m1 * lal.MSUN_SI
+    m2SI = m2 * lal.MSUN_SI
+    f_sampling = Mf_sampling / (M*lal.MTSUN_SI)
+    deltaT = 1./f_sampling
+    f_min = Mf_min / (M*lal.MTSUN_SI)
+
+    # Prefactors to adimension h and t - modes hIlm already adimensioned in this case
+    prefactor_h = 1.
+    prefactor_t = 1.
+
+    # Flags
+    flagSymmetrizehPlminusm = flag_sym
+    if flags_v4P is None:
+        flagHamiltonianDerivative = 0
+        flagEulerextension = 1
+        flagZframe = 0
+        #flagSamplingInspiral = 0
+    else:
+        #print flags_v4P
+        #flagHamiltonianDerivative, flagEulerextension, flagZframe, flagSamplingInspiral = flags_v4P
+        flagHamiltonianDerivative, flagEulerextension, flagZframe = flags_v4P
+
+    # Version of the Hamiltonian, flux/waveform, NQC to be used
+    flag_version_spinaligned = 0
+    if version_spinaligned=='v4':
+        flag_version_spinaligned = 4
+    elif version_spinaligned=='v2':
+        flag_version_spinaligned = 2
+    else:
+        raise ValueError('version_spinaligned %s not recognized.' % version_spinaligned)
+
+    #return (phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, flagHamiltonianDerivative, flagEulerextension, flagZframe)
+
+    # Generate SEOBNRv4P, collect data pieces
+    hplus, hcross, hIlm, hJlm, seobdynamicsAdaSVector, seobdynamicsHiSVector, seobdynamicsAdaSHiSVector, tVecPmodes, hP22_amp, hP22_phase, hP21_amp, hP21_phase, hP33_amp, hP33_phase, hP44_amp, hP44_phase, hP55_amp, hP55_phase, alphaJ2P, betaJ2P, gammaJ2P, mergerParams = lalsim.SimIMRSpinPrecEOBWaveformAll(phi, deltaT, m1SI, m2SI, f_min, distSI, inc, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, modearray, flagSymmetrizehPlminusm, flag_version_spinaligned, flagHamiltonianDerivative, flagEulerextension, flagZframe)
+
+    # Output dictionary - the set of keys will differ for v3, v4P_old, v4P
+    res = {}
+    res['hplus'] = hplus
+    res['hcross'] = hcross
+    res['hIIMR'] = hIlm
+    res['hJIMR'] = hJlm
+    res['dynamicsAdaS'] = seobdynamicsAdaSVector
+    res['dynamicsHiS'] = seobdynamicsHiSVector
+    res['dynamicsAdaSHiS'] = seobdynamicsAdaSHiSVector
+    res['tP'] = tVecPmodes
+    res['hP22_amp'] = hP22_amp
+    res['hP22_phase'] = hP22_phase
+    res['hP21_amp'] = hP21_amp
+    res['hP21_phase'] = hP21_phase
+    res['hP33_amp'] = hP33_amp
+    res['hP33_phase'] = hP33_phase
+    res['hP44_amp'] = hP44_amp
+    res['hP44_phase'] = hP44_phase
+    res['hP55_amp'] = hP55_amp
+    res['hP55_phase'] = hP55_phase
     res['alphaJ2P'] = alphaJ2P
     res['betaJ2P'] = betaJ2P
     res['gammaJ2P'] = gammaJ2P
@@ -534,7 +639,7 @@ def gen_SEOB_aligned(q, chi1z, chi2z, Mf_min, phi=0., Mf_sampling=default_Mf_sam
 # Note: default Mf_sampling corresponds to 4096Hz, 50Msol
 # Generate waveform and extract P-frame angles and modes
 # Note: version_spinaligned and flags_v4P are only taken into account in v4P
-def gen_SEOB(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0., Mf_sampling=default_Mf_sampling, t0choice='tpeak', Pframe='DominantEigenvector', Iframe='initialLN', Iframe_e1e2='e1inplanee1pe3p', version='v4P', version_spinaligned='v4', flags_v4P=None, amp_cut_threshold=1e-12, drop=0, PQconvention='NR'):
+def gen_SEOB(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0., Mf_sampling=default_Mf_sampling, t0choice='tpeak', Pframe='DominantEigenvector', Iframe='initialLN', Iframe_e1e2='e1inplanee1pe3p', version='v4P', version_spinaligned='v4', flags_v4P=None, amp_cut_threshold=1e-12, drop=0, PQconvention='NR', PframeModes='All', flag_sym=True):
 
     #print "(%.16e, %.16e, %.16e, %.16e, %.16e, %.16e, %.16e, %.16e)" % (q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min)
 
@@ -542,16 +647,33 @@ def gen_SEOB(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0.
     wf = {}
 
     # List of modes
-    modes = [(2,2),(2,1),(2,0),(2,-1),(2,-2)]
+    if PframeModes=='All':
+        #if version in ['v3', 'v4Pold', 'v4P']:
+        if version in ['v3', 'v4P']:
+            Pmodes = [(2,2), (2,1)]
+        elif version=='v4PHM':
+            Pmodes = [(2,2), (2,1), (3,3), (4,4), (5,5)]
+        else:
+            raise ValueError('version %s not recognized.' % version)
+    else:
+        Pmodes = PframeModes
+    lvalues = func_lvalues(Pmodes)
+    modes = func_allmodes_lvalues(lvalues)
+    modes_l2 = [(2, 2-m) for m in range(5)] # Will be used for the amplitude
     wf['listmodes'] = modes
+
+    # eta
+    eta = gwtools.etaofq(q)
 
     # Generate SEOBNR waveform according to version - dictionary returned is different in different cases
     if version=='v3':
         wfdict = gen_SEOBNRv3(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=inc, phi=phi, Mf_sampling=Mf_sampling)
-    elif version=='v4Pold':
-        wfdict = gen_SEOBNRv4Pold(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=inc, phi=phi, Mf_sampling=Mf_sampling)
+    # elif version=='v4Pold':
+    #     wfdict = gen_SEOBNRv4Pold(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=inc, phi=phi, Mf_sampling=Mf_sampling)
     elif version=='v4P':
         wfdict = gen_SEOBNRv4P(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=inc, phi=phi, Mf_sampling=Mf_sampling, version_spinaligned=version_spinaligned, flags_v4P=flags_v4P)
+    elif version=='v4PHM':
+        wfdict = gen_SEOBNRv4PHM(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=inc, phi=phi, Mf_sampling=Mf_sampling, version_spinaligned=version_spinaligned, flags_v4P=flags_v4P, PframeModes=Pmodes, flag_sym=flag_sym)
     else:
         raise ValueError('Version %s not recognized.' % version)
 
@@ -603,12 +725,12 @@ def gen_SEOB(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0.
         dynamicsHi = wfdict['dynamicsHi'].data
         nptHi = len(dynamicsHi)/15
         dynHi = np.reshape(dynamicsHi, (15, nptHi))
-    elif version=='v4Pold': # dynLowS was returned in this case, high-sampling dynamics not supported
-        dynamics = wfdict['dynamics'].data
-        npt = len(dynamics)/15
-        dyn = np.reshape(dynamics, (15, npt))
-        dynHi = None
-    elif version=='v4P': # 26-dimensional extended dynamics here
+    # elif version=='v4Pold': # dynLowS was returned in this case, high-sampling dynamics not supported
+    #     dynamics = wfdict['dynamics'].data
+    #     npt = len(dynamics)/15
+    #     dyn = np.reshape(dynamics, (15, npt))
+    #     dynHi = None
+    elif version=='v4P' or version=='v4PHM': # 26-dimensional extended dynamics here
         dynamics = wfdict['dynamicsAdaSHiS'].data
         npt = len(dynamics)/26
         dyn_all = np.reshape(dynamics, (26, npt))
@@ -619,10 +741,13 @@ def gen_SEOB(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0.
         dynHi = dynHi_all[:15] # we only keep the first 15 fields, coming back to the same format as v3 and v4Pold
     else:
         raise ValueError('Version %s not recognized.' % version)
+    # The SEOB dynamics returned by the C code has p/eta instead of p -- here restore p
+    dyn[4:7] *= eta
+    dynHi[4:7] *= eta
     wf['dyn'] = dyn
     wf['dynHi'] = dynHi
     # Also keep the extended dynamics if using v4P
-    if version=='v4P':
+    if version=='v4P' or version=='v4PHM':
         wf['dyn_all'] = dyn_all
         wf['dynHi_all'] = dynHi_all
     else:
@@ -647,19 +772,22 @@ def gen_SEOB(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0.
         chif = finalSpin
         wf['chifvec'] = chifvec
         wf['chif'] = chif
+        wf['Mf'] = None
         wf['mergerParams'] = wfdict['AttachPars'].data
-    elif version=='v4Pold':
-        chifvec = (wfdict['AttachPars'].data)[6:9]
-        chif = gwtools.norm(chifvec)
-        wf['chifvec'] = chifvec
-        wf['chif'] = chif
-        wf['mergerParams'] = None
-    elif version=='v4P': # we set the direction of chif along final J, with chif=finalSpin
+    # elif version=='v4Pold':
+    #     chifvec = (wfdict['AttachPars'].data)[6:9]
+    #     chif = gwtools.norm(chifvec)
+    #     wf['chifvec'] = chifvec
+    #     wf['chif'] = chif
+    #     wf['Mf'] = None
+    #     wf['mergerParams'] = None
+    elif version=='v4P' or version=='v4PHM': # we set the direction of chif along final J, with chif=finalSpin
         Jfvec = (wfdict['mergerParams'].data)[3:6]
         finalMass = (wfdict['mergerParams'].data)[6]
         finalSpin = (wfdict['mergerParams'].data)[7]
         wf['chifvec'] = gwtools.normalize(Jfvec) * finalSpin
         wf['chif'] = finalSpin
+        wf['Mf'] = finalMass
         wf['mergerParams'] = wfdict['mergerParams'].data
     else:
         raise ValueError('Version %s not recognized.' % version)

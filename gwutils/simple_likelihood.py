@@ -30,35 +30,32 @@ def mod2pi(x):
 # Functions to convert to LISA-frame quantities - plus phiL, which has a special definition
 # fullparams in the format of posterior files : [m1, m2, tRef, DL, phiRef, inc, lambda, beta, pol, loglike]
 # Impose ranges phiL in [-pi, pi], psiL in [0, pi], lambdaL in [-pi, pi]
-def funcphiL(postparams):
-    fRef = MfROMmax22/((postparams[0]+postparams[1])*msols)
-    return mod2pi(-postparams[4] + pi*postparams[2]*fRef)
-def funclambdaL(postparams):
-    [lambd, beta] = postparams[6:8]
-    return mod2pi(-arctan2(cos(beta)*cos(lambd)*cos(pi/3) + sin(beta)*sin(pi/3), cos(beta)*sin(lambd)))
-def funcbetaL(postparams):
-    [lambd, beta] = postparams[6:8]
-    return -arcsin(cos(beta)*cos(lambd)*sin(pi/3) - sin(beta)*cos(pi/3))
-def funcpsiL(postparams):
-    [lambd, beta, psi] = postparams[6:9]
-    # We impose psi in [0, pi]
-    psiL = mod2pi(arctan2(cos(pi/3)*cos(beta)*sin(psi) - sin(pi/3)*(sin(lambd)*cos(psi) - cos(lambd)*sin(beta)*sin(psi)), cos(pi/3)*cos(beta)*cos(psi) + sin(pi/3)*(sin(lambd)*sin(psi) + cos(lambd)*sin(beta)*cos(psi))))
-    if psiL<0:
-        psiL += pi
-    return psiL
+def funcphiL_pars(postparams):
+    m1, m2, t, phi = postparams[[0,1,2,4]]
+    return gwtools.funcphiL(m1, m2, t, phi)
+def funclambdaL_pars(postparams):
+    lambd, beta = postparams[[6,7]]
+    return gwtools.funclambdaL(lambd, beta)
+def funcbetaL_pars(postparams):
+    lambd, beta = postparams[[6,7]]
+    return gwtools.funcbetaL(lambd, beta)
+def funcpsiL_pars(postparams):
+    lambd, beta, psi = postparams[[6,7,8]]
+    return gwtools.funcpsiL(lambd, beta, psi)
+# NOTE: this python file was written with old conventions, different from the paper conventions
 def funcconvertparamsL(postparams, injpostparams):
-    phiL = funcphiL(postparams)
-    lambdL = funclambdaL(postparams)
-    betaL = funcbetaL(postparams)
-    psiL = funcpsiL(postparams)
+    phiL = funcphiL_pars(postparams)
+    lambdL = funclambdaL_pars(postparams, defLframe='old')
+    betaL = funcbetaL_pars(postparams)
+    psiL = funcpsiL_pars(postparams)
     inc = postparams[5]
     d = postparams[3] / injpostparams[3]
     return array([d, phiL, inc, lambdL, betaL, psiL])
 def funcconvertallparamsL(postparams):
-    phiL = funcphiL(postparams)
-    lambdL = funclambdaL(postparams)
-    betaL = funcbetaL(postparams)
-    psiL = funcpsiL(postparams)
+    phiL = funcphiL_pars(postparams)
+    lambdL = funclambdaL_pars(postparams, defLframe='old')
+    betaL = funcbetaL_pars(postparams)
+    psiL = funcpsiL_pars(postparams)
     [m1, m2, tRef, DL] = postparams[0:4]
     inc = postparams[5]
     logL = postparams[9]

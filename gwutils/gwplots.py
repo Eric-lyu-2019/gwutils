@@ -693,6 +693,27 @@ def plot_wf_Vf(wf, interval=[-400,150], showQNM=False, exportpdf=False, pdffile=
 ## Functions to parse and manipulate parameter files and posterior files
 ########################################################################
 
+# Functions to convert ptmcmc-formatted params to the L-frame
+def convert_ptmcmc_params_Lframe(x, defLframe='paper'):
+    xc = x.copy()
+    tL = gwtools.functLfromtSSB(x[4], x[8], x[9])
+    phiL = gwtools.funcphiL(x[2], x[3], x[4], x[6])
+    lambdaL = gwtools.funclambdaL(x[8], x[9], defLframe=defLframe)
+    betaL = gwtools.funcbetaL(x[8], x[9])
+    psiL = gwtools.funcpsiL(x[8], x[9], x[10])
+    xc[4] = tL
+    xc[6] = phiL
+    xc[8] = lambdaL
+    xc[9] = betaL
+    xc[10] = psiL
+    return xc
+def convert_ptmcmc_post_Lframe(posterior, defLframe='paper'):
+    return np.array(map(lambda x: convert_ptmcmc_params_Lframe(x, defLframe=defLframe), posterior))
+# Function to convert ptmcmc-formatted posterior to bambi/multinest-formatted posterior
+def convert_ptmcmc_post_to_bambi(posterior):
+    likes = posterior[:,1]
+    otherparams = posterior[:,2:]
+    return np.concatenate((otherparams, np.array([likes]).T), axis=1)
 # Takes a posterior array with m1 and m2 as first columns, and appends columns for M, q, Mchirp, eta
 def compute_massparams_post(post):
     M = post[:,0] + post[:,1]
@@ -701,22 +722,12 @@ def compute_massparams_post(post):
     eta = post[:,0] * post[:,1] / (M * M)
     ext = np.array([M, q, Mchirp, eta]).T
     return np.concatenate((post, ext), axis=1)
+# Takes a posterior wiht bambi/multinest format (columns : params + like) and put it in the plotting format, with other mass params appended and no likelihood
+def convert_post_to_plotformat(post):
+    res = post[:,:-1]
+    res = compute_massparams_post(res)
+    return res
 
-# Conversions between SSB-frame and L-frame parameters
-def functLfromtSSB(tSSB, lambd, beta):
-    return tSSB - gwtools.R/gwtools.c*cos(beta)*cos(gwtools.Omega*tSSB - lambd)
-def functSSBfromtL(tL, lambd, beta):
-    return tL + gwtools.R/gwtools.c*cos(beta)*cos(gwtools.Omega*tL - lambd) - 1./2*Omega*(gwtools.R/gwtools.c*cos(beta))**2*sin(2.*(gwtools.Omega*tL - lambd))
-def funcphiL(m1, m2, t, phi): # note: mod to [0,2pi]
-    MfROMmax22 = 0.14
-    fRef = MfROMmax22/((m1 + m2)*gwtools.msols)
-    return gwtools.mod2pi(-phi + pi*t*fRef)
-def funclambdaL(lambd, beta):
-    return -arctan2(cos(beta)*cos(lambd)*cos(pi/3) + sin(beta)*sin(pi/3), cos(beta)*sin(lambd))
-def funcbetaL(lambd, beta):
-    return -arcsin(cos(beta)*cos(lambd)*sin(pi/3) - sin(beta)*cos(pi/3))
-def funcpsiL(lambd, beta, psi): # note: mod to [0,pi]
-    return gwtools.modpi(arctan2(cos(pi/3)*cos(beta)*sin(psi) - sin(pi/3)*(sin(lambd)*cos(psi) - cos(lambd)*sin(beta)*sin(psi)), cos(pi/3)*cos(beta)*cos(psi) + sin(pi/3)*(sin(lambd)*sin(psi) + cos(lambd)*sin(beta)*cos(psi))))
 # def convertposttSSBtotL(posterior):
 #     post = posterior.copy()
 #     tLvals = np.array(map(lambda x: functLfromtSSB(x[2], x[6], x[7]), post))
@@ -727,21 +738,21 @@ def funcpsiL(lambd, beta, psi): # note: mod to [0,pi]
 #     tSSBvals = np.array(map(lambda x: functSSBfromtL(x[2], x[6], x[7]), post))
 #     post[:,2] = tSSBvals
 #     return post
-def convert_params_Lframe(x):
+def convert_params_Lframe(x, defLframe='paper'):
     xc = x.copy()
-    tL = functLfromtSSB(x[2], x[6], x[7])
-    phiL = funcphiL(x[0], x[1], x[2], x[4])
-    lambdaL = funclambdaL(x[6], x[7])
-    betaL = funcbetaL(x[6], x[7])
-    psiL = funcpsiL(x[6], x[7], x[8])
+    tL = gwtools.functLfromtSSB(x[2], x[6], x[7])
+    phiL = gwtools.funcphiL(x[0], x[1], x[2], x[4])
+    lambdaL = gwtools.funclambdaL(x[6], x[7], defLframe=defLframe)
+    betaL = gwtools.funcbetaL(x[6], x[7])
+    psiL = gwtools.funcpsiL(x[6], x[7], x[8])
     xc[2] = tL
     xc[4] = phiL
     xc[6] = lambdaL
     xc[7] = betaL
     xc[8] = psiL
     return xc
-def convert_post_Lframe(posterior):
-    return np.array(map(lambda x: convert_params_Lframe(x), posterior))
+def convert_post_Lframe(posterior, defLframe='paper'):
+    return np.array(map(lambda x: convert_params_Lframe(x, defLframe=defLframe), posterior))
 
 # Functions to parse a bambi .out file
 # Extract evolution of evidence and acceptance rate with the number of evaluations
@@ -848,11 +859,18 @@ def read_covariance(file):
         i=0
         for par in pars:
             line=f.readline()
-            print(i,":",line)
+            #print(i,":",line)
             covar[i]=np.array(line.split())
             i+=1
-        print "done"
+        #print "done"
     return covar
+# Convert SSB-frame covariance to L-frame
+# Fisher matrix : if J_{a',b} = \partial xL^a' / \partial x^b Jacobian matrix
+# F' = tJ^-1 . F . J^-1
+# C' = (F^-1)' = J . C . tJ
+def convert_covariance_Lframe(params, cov):
+    J = gwtools.funcJacobianSSBtoLframe(params)
+    return np.dot(J, np.dot(cov, J.T))
 
 # Compute posterior values for individual posterior samples by multiplying with the prior
 # Assumes a np array for the posterior samples, the last column being the likelihood values
@@ -1009,7 +1027,7 @@ def scale_covariance(cov, scales):
 # Default levels for contours in 2d histogram - TODO: check the correspondence with 1,2,3sigma
 default_levels = 1.0 - np.exp(-0.5 * np.linspace(1.0, 3.0, num=3) ** 2)
 
-def corner_plot(injparams, posterior, output=False, output_dir=None, output_file=None, histograms=True, fisher=False, cov_file=None, detector='LISA', params=['m1', 'm2', 'Deltat', 'D', 'phi', 'inc', 'lambda', 'beta', 'pol'], params_range=None, Lframe=False, scales=None, bins=50, quantiles=[0.159, 0.5, 0.841], levels=default_levels, plot_contours=True, plot_datapoints=True, label_kwargs={"fontsize": 12}, show_titles=True):
+def corner_plot(injparams, posterior, output=False, output_dir=None, output_file=None, histograms=True, fisher=False, cov=None, detector='LISA', params=['m1', 'm2', 'Deltat', 'D', 'phi', 'inc', 'lambda', 'beta', 'pol'], params_range=None, Lframe=False, scales=None, bins=50, quantiles=[0.159, 0.5, 0.841], levels=default_levels, plot_contours=True, plot_datapoints=True, label_kwargs={"fontsize": 12}, show_titles=True):
 
     # If required, transform to parameters in the L-frame
     if Lframe:
@@ -1034,10 +1052,12 @@ def corner_plot(injparams, posterior, output=False, output_dir=None, output_file
 
     # If required, load Fisher matrix
     if fisher:
+        if cov is None:
+            raise ValueError('Covariance matrix not specified.')
         # For now, Fisher matrix is only available from J.B.'s code with the original parameters, no derived mass params
         if any([p in params for p in ['M', 'q', 'Mchirp', 'eta']]):
             raise ValueError('Only m1, m2 are supported as mass parameters for the Fisher matrix.')
-        cov = read_covariance(cov_file)
+        #cov = read_covariance(cov_file)
         cov = scale_covariance(cov, scalefactors)
         ordered_cols_cartesian = np.ix_(ordered_cols, ordered_cols)
         cov = cov[ordered_cols_cartesian]
