@@ -694,10 +694,10 @@ def plot_wf_Vf(wf, interval=[-400,150], showQNM=False, exportpdf=False, pdffile=
 ########################################################################
 
 # Functions to convert ptmcmc-formatted params to the L-frame
-def convert_ptmcmc_params_Lframe(x, defLframe='paper'):
+def convert_ptmcmc_params_Lframe(x, defLframe='paper', SetphiRefSSBAtfRef=False):
     xc = x.copy()
     tL = gwtools.functLfromtSSB(x[4], x[8], x[9])
-    phiL = gwtools.funcphiL(x[2], x[3], x[4], x[6])
+    phiL = gwtools.funcphiL(x[2], x[3], x[4], x[6], SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
     lambdaL = gwtools.funclambdaL(x[8], x[9], defLframe=defLframe)
     betaL = gwtools.funcbetaL(x[8], x[9])
     psiL = gwtools.funcpsiL(x[8], x[9], x[10])
@@ -707,8 +707,8 @@ def convert_ptmcmc_params_Lframe(x, defLframe='paper'):
     xc[9] = betaL
     xc[10] = psiL
     return xc
-def convert_ptmcmc_post_Lframe(posterior, defLframe='paper'):
-    return np.array(map(lambda x: convert_ptmcmc_params_Lframe(x, defLframe=defLframe), posterior))
+def convert_ptmcmc_post_Lframe(posterior, defLframe='paper', SetphiRefSSBAtfRef=False):
+    return np.array(map(lambda x: convert_ptmcmc_params_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), posterior))
 # Function to convert ptmcmc-formatted posterior to bambi/multinest-formatted posterior
 def convert_ptmcmc_post_to_bambi(posterior):
     likes = posterior[:,1]
@@ -738,10 +738,10 @@ def convert_post_to_plotformat(post):
 #     tSSBvals = np.array(map(lambda x: functSSBfromtL(x[2], x[6], x[7]), post))
 #     post[:,2] = tSSBvals
 #     return post
-def convert_params_Lframe(x, defLframe='paper'):
+def convert_params_Lframe(x, defLframe='paper', SetphiRefSSBAtfRef=False):
     xc = x.copy()
     tL = gwtools.functLfromtSSB(x[2], x[6], x[7])
-    phiL = gwtools.funcphiL(x[0], x[1], x[2], x[4])
+    phiL = gwtools.funcphiL(x[0], x[1], x[2], x[4], SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
     lambdaL = gwtools.funclambdaL(x[6], x[7], defLframe=defLframe)
     betaL = gwtools.funcbetaL(x[6], x[7])
     psiL = gwtools.funcpsiL(x[6], x[7], x[8])
@@ -751,8 +751,8 @@ def convert_params_Lframe(x, defLframe='paper'):
     xc[7] = betaL
     xc[8] = psiL
     return xc
-def convert_post_Lframe(posterior, defLframe='paper'):
-    return np.array(map(lambda x: convert_params_Lframe(x, defLframe=defLframe), posterior))
+def convert_post_Lframe(posterior, defLframe='paper', SetphiRefSSBAtfRef=False):
+    return np.array(map(lambda x: convert_params_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), posterior))
 
 # Functions to parse a bambi .out file
 # Extract evolution of evidence and acceptance rate with the number of evaluations
@@ -864,12 +864,32 @@ def read_covariance(file):
             i+=1
         #print "done"
     return covar
+def read_fisher(file):
+    pars=[]
+    done=False
+    trycount=0
+    with open(file,'r') as f:
+        line="#"
+        while("#" in line): line=f.readline() #Skip comment
+        for val in line.split():
+            pars.append(float(val))
+        Npar=len(pars)
+        while(not "#Fisher" in line):line=f.readline() #Skip until the good stuff
+        covar=np.zeros((Npar,Npar))
+        i=0
+        for par in pars:
+            line=f.readline()
+            #print(i,":",line)
+            covar[i]=np.array(line.split())
+            i+=1
+        #print "done"
+    return covar
 # Convert SSB-frame covariance to L-frame
 # Fisher matrix : if J_{a',b} = \partial xL^a' / \partial x^b Jacobian matrix
 # F' = tJ^-1 . F . J^-1
 # C' = (F^-1)' = J . C . tJ
-def convert_covariance_Lframe(params, cov):
-    J = gwtools.funcJacobianSSBtoLframe(params)
+def convert_covariance_Lframe(params, cov, SetphiRefSSBAtfRef=False):
+    J = gwtools.funcJacobianSSBtoLframe(params, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
     return np.dot(J, np.dot(cov, J.T))
 
 # Compute posterior values for individual posterior samples by multiplying with the prior
@@ -1019,20 +1039,23 @@ def scale_injparams(injparams, scales):
     scaling = np.array([1./sM, 1./sM, 1./st, 1./sD, 1., 1., 1., 1., 1., 1./sM, 1., 1./sM, 1.])
     return np.multiply(injparams, scaling)
 # Assumed format for covariance: m1 m2 Deltat D phi inc lambda beta pol
-def scale_covariance(cov, scales):
+def scale_covariance(cov, scales, params):
     [sM, sD, st] = scales
-    scaling = np.diag(np.array([1./sM, 1./sM, 1./st, 1./sD, 1., 1., 1., 1., 1.]))
+    scale_dict = {'m1':sM, 'm2':sM, 'Mchirp':sM, 'M':sM, 'q':1., 'eta':1., 'D':sD, 'Deltat':st, 'phi':1., 'inc':1., 'lambda':1., 'beta':1., 'pol':1.}
+    scaling = np.diag(np.array([1./scale_dict[p] for p in params]))
     return np.dot(scaling, np.dot(cov, scaling))
 
 # Default levels for contours in 2d histogram - TODO: check the correspondence with 1,2,3sigma
 default_levels = 1.0 - np.exp(-0.5 * np.linspace(1.0, 3.0, num=3) ** 2)
 
-def corner_plot(injparams, posterior, output=False, output_dir=None, output_file=None, histograms=True, fisher=False, cov=None, detector='LISA', params=['m1', 'm2', 'Deltat', 'D', 'phi', 'inc', 'lambda', 'beta', 'pol'], params_range=None, Lframe=False, scales=None, bins=50, quantiles=[0.159, 0.5, 0.841], levels=default_levels, plot_contours=True, plot_datapoints=True, label_kwargs={"fontsize": 12}, show_titles=True):
+def corner_plot(injparams, posterior, add_posteriors=None, output=False, output_dir=None, output_file=None, histograms=True, fisher=False, cov=None, detector='LISA', params=['m1', 'm2', 'Deltat', 'D', 'phi', 'inc', 'lambda', 'beta', 'pol'], params_range=None, Lframe=False, scales=None, add_truths=None, color="k", add_colors=None, cov_color=None, truth_color="#4682b4", add_truth_colors=None, bins=50, show_histograms=True, quantiles=[0.159, 0.5, 0.841], show_quantiles=True, levels=default_levels, plot_density=True, plot_contours=True, plot_datapoints=True, smooth=None, smooth1d=None, label_kwargs={"fontsize": 16}, show_titles=True, defLframe='paper', SetphiRefSSBAtfRef=False, no_reorder_fisher=False, plot_density_add_post=False):
 
     # If required, transform to parameters in the L-frame
     if Lframe:
-        injparams = convert_params_Lframe(injparams)
-        posterior = convert_post_Lframe(posterior)
+        injparams = convert_params_Lframe(injparams, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
+        posterior = convert_post_Lframe(posterior, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
+        if add_posteriors is not None:
+            add_posteriors = map(lambda x: convert_post_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), add_posteriors)
 
     # If not provided, determine automatically scales [M, D, t]
     if not scales:
@@ -1043,35 +1066,59 @@ def corner_plot(injparams, posterior, output=False, output_dir=None, output_file
     scalefactors = [scale_dict_M[scale_M], scale_dict_D[scale_D], scale_dict_t[scale_t]]
     injparams_scaled = scale_injparams(injparams, scalefactors)
     posterior_scaled = scale_posterior(posterior, scalefactors)
+    if add_posteriors is not None:
+        add_posteriors = map(lambda x: scale_posterior(x, scalefactors), add_posteriors)
 
     # Posterior and injection parameters for the ordered set of params required
     parmap = paramsmap(detector)
     ordered_cols = map(parmap.get, params)
     ordered_posterior = posterior_scaled[:,ordered_cols]
     ordered_injparams = injparams_scaled[ordered_cols]
+    if add_posteriors is not None:
+        ordered_add_posteriors = map(lambda x: x[:,ordered_cols], add_posteriors)
+    if add_truths is not None:
+        ordered_add_truths = map(lambda x: x[ordered_cols], add_truths)
+    else:
+        ordered_add_truths = None
 
     # If required, load Fisher matrix
+    # Use no_reorder_fisher e.g. if the input Fisher matrix is given in Mchirp-eta
     if fisher:
         if cov is None:
             raise ValueError('Covariance matrix not specified.')
         # For now, Fisher matrix is only available from J.B.'s code with the original parameters, no derived mass params
-        if any([p in params for p in ['M', 'q', 'Mchirp', 'eta']]):
-            raise ValueError('Only m1, m2 are supported as mass parameters for the Fisher matrix.')
+        if not no_reorder_fisher and any([p in params for p in ['M', 'q', 'Mchirp', 'eta']]):
+            raise ValueError('If not ignore_param_reordering_fisher, only m1, m2 are supported as mass parameters for the Fisher matrix.')
         #cov = read_covariance(cov_file)
-        cov = scale_covariance(cov, scalefactors)
         ordered_cols_cartesian = np.ix_(ordered_cols, ordered_cols)
-        cov = cov[ordered_cols_cartesian]
+        if not no_reorder_fisher:
+            cov = cov[ordered_cols_cartesian]
+        cov = scale_covariance(cov, scalefactors, params)
     else:
         cov = None
 
     # Main call to corner function
     label_dict = param_label_dict(detector, scales_val, Lframe)
     labels = map(lambda x: label_dict[x], params)
-    fig = corner_covar.corner(ordered_posterior, cov=cov, bins=bins, params_range=params_range, levels=levels,
-                                 labels=labels, label_kwargs={"fontsize": 16},
-                                 truths=ordered_injparams, plot_datapoints=plot_datapoints,
-                                 quantiles=quantiles, plot_contours=plot_contours,
-                                 show_titles=show_titles)
+    fig, axes = corner_covar.corner(ordered_posterior, cov=cov, bins=bins, params_range=params_range, levels=levels,
+                                 labels=labels, label_kwargs=label_kwargs, color=color,
+                                 truths=ordered_injparams, add_truths=ordered_add_truths, truth_color=truth_color, add_truth_colors=add_truth_colors, plot_datapoints=plot_datapoints,
+                                 smooth=smooth, smooth1d=smooth1d, show_histograms=show_histograms,
+                                 quantiles=quantiles, show_quantiles=show_quantiles, plot_contours=plot_contours,
+                                 show_titles=show_titles, plot_density=plot_density)
+
+    # Overlay other posterior
+    if add_posteriors is not None:
+        if add_colors is None:
+            add_colors = [gwtools.plotpalette[i % len(gwtools.plotpalette)] for i in range(len(add_posteriors))]
+        for i, add_post in enumerate(ordered_add_posteriors):
+            corner_covar.corner(add_post, figaxes=(fig, axes), cov=None, bins=bins, params_range=params_range, levels=levels,
+                                     labels=labels, label_kwargs=label_kwargs, color=add_colors[i],
+                                     truths=None, plot_datapoints=plot_datapoints,
+                                     smooth=smooth, smooth1d=smooth1d, show_histograms=show_histograms,
+                                     quantiles=quantiles, show_quantiles=show_quantiles, plot_contours=plot_contours,
+                                     show_titles=False,
+                                     plot_density=plot_density_add_post, no_fill_contours=True)
 
     # Output
     if output:
@@ -1079,6 +1126,6 @@ def corner_plot(injparams, posterior, output=False, output_dir=None, output_file
             raise ValueError('output_dir not defined.')
         if not output_file:
             raise ValueError('output_file not defined.')
-        fig.savefig(output_dir + output_file)
+        fig.savefig(output_dir + output_file, bbox_inches='tight')
     else:
         return fig

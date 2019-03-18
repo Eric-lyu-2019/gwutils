@@ -13,7 +13,6 @@ from math import pi, factorial
 from numpy import array, conjugate, dot, sqrt, cos, sin, tan, exp, real, imag, arccos, arcsin, arctan, arctan2
 import scipy
 import scipy.interpolate as ip
-from scipy.interpolate import InterpolatedUnivariateSpline as spline
 import scipy.optimize as op
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -26,6 +25,11 @@ import Quaternions
 #import imp
 #utils = imp.load_source('utils', '/Users/marsat/Mathematica/Programmes/eLISA/utils.py')
 #from utils import *
+
+# Cubic spline interpolation
+# Note that the defaults ext=2 forbids any extrapolation - return ValueError in that case
+def spline(x, y, k=3, ext=2):
+    return ip.InterpolatedUnivariateSpline(x, y, k=k, ext=ext)
 
 # Numerical values - taken from LAL for physical quantities, but pure numbers like pi are from numpy
 msols = 4.925491025543575903411922162094833998e-6
@@ -52,12 +56,12 @@ QNMlmndata[(2,1,0)] = np.loadtxt(resources_dir+'QNM/QNMl2/n1l2m1.dat')
 QNMlmndata[(2,0,0)] = np.loadtxt(resources_dir+'QNM/QNMl2/n1l2m0.dat')
 QNMomegalmnInt = {}
 QNMsigmalmnInt = {}
-QNMomegalmnInt[(2,2,0)] = ip.InterpolatedUnivariateSpline(QNMlmndata[(2,2,0)][:,0], QNMlmndata[(2,2,0)][:,1], k=3)
-QNMomegalmnInt[(2,1,0)] = ip.InterpolatedUnivariateSpline(QNMlmndata[(2,1,0)][:,0], QNMlmndata[(2,1,0)][:,1], k=3)
-QNMomegalmnInt[(2,0,0)] = ip.InterpolatedUnivariateSpline(QNMlmndata[(2,0,0)][:,0], QNMlmndata[(2,0,0)][:,1], k=3)
-QNMsigmalmnInt[(2,2,0)] = ip.InterpolatedUnivariateSpline(QNMlmndata[(2,2,0)][:,0], -QNMlmndata[(2,2,0)][:,2], k=3)
-QNMsigmalmnInt[(2,1,0)] = ip.InterpolatedUnivariateSpline(QNMlmndata[(2,1,0)][:,0], -QNMlmndata[(2,1,0)][:,2], k=3)
-QNMsigmalmnInt[(2,0,0)] = ip.InterpolatedUnivariateSpline(QNMlmndata[(2,0,0)][:,0], -QNMlmndata[(2,0,0)][:,2], k=3)
+QNMomegalmnInt[(2,2,0)] = spline(QNMlmndata[(2,2,0)][:,0], QNMlmndata[(2,2,0)][:,1])
+QNMomegalmnInt[(2,1,0)] = spline(QNMlmndata[(2,1,0)][:,0], QNMlmndata[(2,1,0)][:,1])
+QNMomegalmnInt[(2,0,0)] = spline(QNMlmndata[(2,0,0)][:,0], QNMlmndata[(2,0,0)][:,1])
+QNMsigmalmnInt[(2,2,0)] = spline(QNMlmndata[(2,2,0)][:,0], -QNMlmndata[(2,2,0)][:,2])
+QNMsigmalmnInt[(2,1,0)] = spline(QNMlmndata[(2,1,0)][:,0], -QNMlmndata[(2,1,0)][:,2])
+QNMsigmalmnInt[(2,0,0)] = spline(QNMlmndata[(2,0,0)][:,0], -QNMlmndata[(2,0,0)][:,2])
 
 # Function to close all open hdf5 files
 def closeHDF5files():
@@ -81,6 +85,14 @@ def Mchirpofm1m2(m1, m2):
     return (m1*m2)**(3./5) / (m1+m2)**(1./5)
 def etaofm1m2(m1, m2):
     return (m1*m2)/(m1+m2)**2.
+def m1ofMchirpeta(Mchirp, eta):
+    M = Mchirp * np.power(eta, -3./5)
+    delta = np.sqrt(1 - 4*eta)
+    return M * (1+delta)/2.
+def m2ofMchirpeta(Mchirp, eta):
+    M = Mchirp * np.power(eta, -3./5)
+    delta = np.sqrt(1 - 4*eta)
+    return M * (1-delta)/2.
 
 # Newtonian estimate of the relation Mf(deltat/M) (for the 22 mode) - gives the starting geometric frequency for a given mass ratio and a given geometric duration of the observations
 def funcNewtonianfoftGeom(q, deltat):
@@ -121,10 +133,13 @@ def load_binary_data(filename, ncol):
 # Mod 2pi - shifted to return a result in [-pi, pi[
 def mod2pi(x):
     rem = np.remainder(x, 2*pi)
-    if rem<=pi:
-        return rem
+    if isinstance(x, np.ndarray) and x.shape is not ():
+        mask = (rem>pi)
+        rem[mask] -= 2*pi
     else:
-        return rem - 2*pi
+        if rem>pi:
+            rem -= 2*pi
+    return rem
 # Mod pi
 def modpi(x):
     return np.remainder(x, pi)
@@ -152,10 +167,20 @@ def functLfromtSSB(tSSB, lambd, beta):
     return tSSB - R/c*cos(beta)*cos(Omega*tSSB - lambd)
 def functSSBfromtL(tL, lambd, beta):
     return tL + R/c*cos(beta)*cos(Omega*tL - lambd) - 1./2*Omega*(R/c*cos(beta))**2*sin(2.*(Omega*tL - lambd))
-def funcphiL(m1, m2, t, phi): # note: mod to [0,2pi]
-    MfROMmax22 = 0.14
-    fRef = MfROMmax22/((m1 + m2)*msols)
-    return mod2pi(-phi + pi*t*fRef)
+# Option SetphiRefSSBAtfRef indicates the meaning of phase in the input SSB frame
+# L-frame phase is always a pure observer phase shift, equivalent to having SetphiRefSSBAtfRef=False AND flipping the sign
+# So phiL = -phiSSB(SetphiRefSSBAtfRef=False)
+# We set phiL' = -phiSSB(SetphiRefSSBAtfRef=True) + pi*tSSB*fRef to remove the tRef-dependence
+# NOTE: phiL != phiL'
+# the two still differ by fRef-dependent terms that require access to the waveform to evaluate
+# NOTE: phiL' only supports fRef set at its default, the maximum 22 frequency covered by the ROM
+def funcphiL(m1, m2, tSSB, phiSSB, SetphiRefSSBAtfRef=False): # note: mod to [0,2pi]
+    if not SetphiRefSSBAtfRef:
+        return -phiSSB
+    else:
+        MfROMmax22 = 0.14
+        fRef = MfROMmax22/((m1 + m2)*msols)
+        return mod2pi(-phiSSB + pi*tSSB*fRef)
 # NOTE: simple relation between L-frame definitions
 # lambdaL_old = lambdaL_paper - pi/2
 def funclambdaL(lambd, beta, defLframe='paper'):
@@ -172,28 +197,116 @@ def funcbetaL(lambd, beta):
 def funcpsiL(lambd, beta, psi): # note: mod to [0,pi]
     return modpi(psi + arctan2(-sin(pi/3)*sin(lambd), cos(pi/3)*cos(beta) + sin(pi/3)*cos(lambd)*sin(beta)))
 
+# Copy of C functions for translation between frames
+# We modify constellation variant, keeping only the initial constellation phase : Omega is fixed, constellation_ini_phase replaces variant->ConstPhi0
+# NOTE: C function for time duplicate python functions functLfromtSSB and functSSBfromtL
+# Compute Solar System Barycenter time tSSB from retarded time at the center of the LISA constellation tL
+# NOTE: depends on the sky position given in SSB parameters
+def tSSBfromLframe(tL, lambdaSSB, betaSSB, constellation_ini_phase=0.):
+    phase = Omega*tL + constellation_ini_phase - lambdaSSB
+    RoC = R/c
+    return tL + RoC*cos(betaSSB)*cos(phase) - 1./2*Omega*pow(RoC*cos(betaSSB), 2)*sin(2.*phase);
+# Compute retarded time at the center of the LISA constellation tL from Solar System Barycenter time tSSB */
+def tLfromSSBframe(tSSB, lambdaSSB, betaSSB, constellation_ini_phase=0.):
+    phase = Omega*tSSB + constellation_ini_phase - lambdaSSB
+    RoC = R/c
+    return tSSB - RoC*cos(betaSSB)*cos(phase)
+# Convert L-frame params to SSB-frame params
+# NOTE: no transformation of the phase -- approximant-dependence with e.g. EOBNRv2HMROM setting phiRef at fRef, and freedom in definition
+def ConvertLframeParamsToSSBframe(
+    tL,
+    lambdaL,
+    betaL,
+    psiL,
+    constellation_ini_phase=0.):
+
+    alpha = 0.; cosalpha = 0; sinalpha = 0.; coslambdaL = 0; sinlambdaL = 0.; cosbetaL = 0.; sinbetaL = 0.; cospsiL = 0.; sinpsiL = 0.;
+    coszeta = cos(pi/3.)
+    sinzeta = sin(pi/3.)
+    coslambdaL = cos(lambdaL)
+    sinlambdaL = sin(lambdaL)
+    cosbetaL = cos(betaL)
+    sinbetaL = sin(betaL)
+    cospsiL = cos(psiL)
+    sinpsiL = sin(psiL)
+    lambdaSSB_approx = 0.
+    betaSSB_approx = 0.
+    # Initially, approximate alpha using tL instead of tSSB - then iterate
+    tSSB_approx = tL
+    for k in range(3):
+        alpha = Omega * (tSSB_approx) + constellation_ini_phase
+        cosalpha = cos(alpha)
+        sinalpha = sin(alpha)
+        lambdaSSB_approx = arctan2(cosalpha*cosalpha*cosbetaL*sinlambdaL -sinalpha*sinbetaL*sinzeta + cosbetaL*coszeta*sinalpha*sinalpha*sinlambdaL -cosalpha*cosbetaL*coslambdaL*sinalpha + cosalpha*cosbetaL*coszeta*coslambdaL*sinalpha, cosbetaL*coslambdaL*sinalpha*sinalpha -cosalpha*sinbetaL*sinzeta + cosalpha*cosalpha*cosbetaL*coszeta*coslambdaL -cosalpha*cosbetaL*sinalpha*sinlambdaL + cosalpha*cosbetaL*coszeta*sinalpha*sinlambdaL)
+        betaSSB_approx = arcsin(coszeta*sinbetaL + cosalpha*cosbetaL*coslambdaL*sinzeta + cosbetaL*sinalpha*sinzeta*sinlambdaL)
+        tSSB_approx = tSSBfromLframe(tL, lambdaSSB_approx, betaSSB_approx, constellation_ini_phase=constellation_ini_phase)
+    tSSB = tSSB_approx
+    lambdaSSB = lambdaSSB_approx
+    betaSSB = betaSSB_approx
+    # Polarization
+    psiSSB = modpi(psiL + arctan2(cosalpha*sinzeta*sinlambdaL -coslambdaL*sinalpha*sinzeta, cosbetaL*coszeta -cosalpha*coslambdaL*sinbetaL*sinzeta -sinalpha*sinbetaL*sinzeta*sinlambdaL))
+    return [tSSB, lambdaSSB, betaSSB, psiSSB]
+# Convert SSB-frame params to L-frame params
+# NOTE: no transformation of the phase -- approximant-dependence with e.g. EOBNRv2HMROM setting phiRef at fRef, and freedom in definition
+def ConvertSSBframeParamsToLframe(
+    tSSB,
+    lambdaSSB,
+    betaSSB,
+    psiSSB,
+    constellation_ini_phase=0.):
+
+    alpha = 0.; cosalpha = 0; sinalpha = 0.; coslambda = 0; sinlambda = 0.; cosbeta = 0.; sinbeta = 0.; cospsi = 0.; sinpsi = 0.;
+    coszeta = cos(pi/3.)
+    sinzeta = sin(pi/3.)
+    coslambda = cos(lambdaSSB)
+    sinlambda = sin(lambdaSSB)
+    cosbeta = cos(betaSSB)
+    sinbeta = sin(betaSSB)
+    cospsi = cos(psiSSB)
+    sinpsi = sin(psiSSB)
+    alpha = Omega * (tSSB) + constellation_ini_phase
+    cosalpha = cos(alpha)
+    sinalpha = sin(alpha)
+    tL = tLfromSSBframe(tSSB, lambdaSSB, betaSSB, constellation_ini_phase=constellation_ini_phase)
+    lambdaL = arctan2(cosalpha*cosalpha*cosbeta*sinlambda + sinalpha*sinbeta*sinzeta + cosbeta*coszeta*sinalpha*sinalpha*sinlambda -cosalpha*cosbeta*coslambda*sinalpha + cosalpha*cosbeta*coszeta*coslambda*sinalpha, cosalpha*sinbeta*sinzeta + cosbeta*coslambda*sinalpha*sinalpha + cosalpha*cosalpha*cosbeta*coszeta*coslambda -cosalpha*cosbeta*sinalpha*sinlambda + cosalpha*cosbeta*coszeta*sinalpha*sinlambda)
+    betaL = arcsin(coszeta*sinbeta -cosalpha*cosbeta*coslambda*sinzeta -cosbeta*sinalpha*sinzeta*sinlambda)
+    psiL = modpi(psiSSB + arctan2(coslambda*sinalpha*sinzeta -cosalpha*sinzeta*sinlambda, cosbeta*coszeta + cosalpha*coslambda*sinbeta*sinzeta + sinalpha*sinbeta*sinzeta*sinlambda))
+    return [tL, lambdaL, betaL, psiL]
+
 # Derivatives of L-frame parameters with respect to SSB-frame parameters
 # tL
 def funcdtLdtSSB(tSSB, lambd, beta):
-    return 1 + R/c*cos(beta) * Omega*sin(Omega*tSSB - lambd)
+    return 1 + R/c * cos(beta) * Omega*sin(Omega*tSSB - lambd)
 def funcdtLdlambda(tSSB, lambd, beta):
-    return R/c*cos(beta)*sin(Omega*tSSB - lambd)
+    return -R/c * cos(beta) * sin(Omega*tSSB - lambd)
 def funcdtLdbeta(tSSB, lambd, beta):
-    return R/c*sin(beta)*cos(Omega*tSSB - lambd)
+    return R/c * sin(beta) * cos(Omega*tSSB - lambd)
 # phiL
-def funcdphiLdm1(m1, m2, t, phi):
-    MfROMmax22 = 0.14
-    dfRefdm1 = -MfROMmax22/((m1 + m2)**2 * msols)
-    return pi*t*dfRefdm1
-def funcdphiLdm2(m1, m2, t, phi):
-    MfROMmax22 = 0.14
-    dfRefdm2 = -MfROMmax22/((m1 + m2)**2 * msols)
-    return pi*t*dfRefdm2
-def funcdphiLdt(m1, m2, t, phi):
-    MfROMmax22 = 0.14
-    fRef = MfROMmax22/((m1 + m2)*msols)
-    return pi*fRef
-def funcdphiLdphi(m1, m2, t, phi):
+# Option SetphiRefSSBAtfRef indicates the meaning of phase in the input SSB frame
+# L-frame phase is always a pure observer phase phase shift, equivalent to having SetphiRefSSBAtfRef=False AND flipping the sign
+# So phiL = -phiSSB(SetphiRefSSBAtfRef=False)
+def funcdphiLdm1(m1, m2, t, phi, SetphiRefSSBAtfRef=False):
+    if SetphiRefSSBAtfRef:
+        MfROMmax22 = 0.14
+        dfRefdm1 = -MfROMmax22/((m1 + m2)**2 * msols)
+        return pi*t*dfRefdm1
+    else:
+        return 0.
+def funcdphiLdm2(m1, m2, t, phi, SetphiRefSSBAtfRef=False):
+    if SetphiRefSSBAtfRef:
+        MfROMmax22 = 0.14
+        dfRefdm2 = -MfROMmax22/((m1 + m2)**2 * msols)
+        return pi*t*dfRefdm2
+    else:
+        return 0.
+def funcdphiLdt(m1, m2, t, phi, SetphiRefSSBAtfRef=False):
+    if SetphiRefSSBAtfRef:
+        MfROMmax22 = 0.14
+        fRef = MfROMmax22/((m1 + m2)*msols)
+        return pi*fRef
+    else:
+        return 0.
+def funcdphiLdphi(m1, m2, t, phi, SetphiRefSSBAtfRef=False):
     return -1
 # lambdaL
 # NOTE: derivative identical for different L-frame conventions that differ by a constant shift in lambdaL
@@ -205,9 +318,9 @@ def funcdlambdaLdbeta(lambd, beta):
   cos(beta)**2*sin(lambd)**2))
 # betaL
 def funcdbetaLdlambda(lambd, beta):
-    return -cos(beta)*sin(pi/3)*sin(lambd) / np.sqrt(1 - (cos(pi/3)*sin(beta) - cos(beta)*cos(lambd)*sin(pi/3))**2)
+    return cos(beta)*sin(pi/3)*sin(lambd) / np.sqrt(1 - (cos(pi/3)*sin(beta) - cos(beta)*cos(lambd)*sin(pi/3))**2)
 def funcdbetaLdbeta(lambd, beta):
-    return (-cos(beta)*cos(pi/3) - cos(lambd)*sin(beta)*sin(pi/3)) / np.sqrt(1 - (cos(pi/3)*sin(beta) - cos(beta)*cos(lambd)*sin(pi/3))**2)
+    return (cos(beta)*cos(pi/3) + cos(lambd)*sin(beta)*sin(pi/3)) / np.sqrt(1 - (cos(pi/3)*sin(beta) - cos(beta)*cos(lambd)*sin(pi/3))**2)
 # psiL
 def funcdpsiLdlambda(lambd, beta, psi):
     return -((sin(pi/3)*(cos(beta)*cos(pi/3)*cos(lambd) + sin(beta)*sin(pi/3))) / ((cos(beta)*cos(pi/3) + cos(lambd)*sin(beta)*sin(pi/3))**2 + sin(pi/3)**2 * sin(lambd)**2))
@@ -220,7 +333,9 @@ def funcdpsiLdpsi(lambd, beta, psi):
 # Required to convert Fisher matrices computed with SSB params to L-frame params
 # Parameters order : m1 m2 t D phi inc lambda beta psi
 # Matrix Jij = \partial xLi / \partial xj
-def funcJacobianSSBtoLframe(params):
+# Option SetphiRefSSBAtfRef indicates the meaning of phase in the input SSB frame
+# L-frame phase is always a pure phase shift, like having SetphiRefSSBAtfRef=False
+def funcJacobianSSBtoLframe(params, SetphiRefSSBAtfRef=False):
     m1, m2, t, D, phi, inc, lambd, beta, psi = params
     J = np.zeros((9,9), dtype=float)
     # m1
@@ -233,11 +348,11 @@ def funcJacobianSSBtoLframe(params):
     J[2,7] = funcdtLdbeta(t, lambd, beta)
     # D
     J[3,3] = 1.
-    # phiL
-    J[4,0] = funcdphiLdm1(m1, m2, t, phi)
-    J[4,1] = funcdphiLdm2(m1, m2, t, phi)
-    J[4,2] = funcdphiLdt(m1, m2, t, phi)
-    J[4,4] = funcdphiLdphi(m1, m2, t, phi)
+    # phi - uses
+    J[4,0] = funcdphiLdm1(m1, m2, t, phi, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
+    J[4,1] = funcdphiLdm2(m1, m2, t, phi, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
+    J[4,2] = funcdphiLdt(m1, m2, t, phi, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
+    J[4,4] = funcdphiLdphi(m1, m2, t, phi, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
     # inc
     J[5,5] = 1.
     # lambdaL
@@ -346,8 +461,8 @@ def logspace(start, stop, nb):
 
 # Resample waveform (either Re/Im or Amp/Phase) on input samples
 def resample(wf, samples):
-    int1 = ip.InterpolatedUnivariateSpline(wf[:,0], wf[:,1], k=3)
-    int2 = ip.InterpolatedUnivariateSpline(wf[:,0], wf[:,2], k=3)
+    int1 = spline(wf[:,0], wf[:,1])
+    int2 = spline(wf[:,0], wf[:,2])
     return np.array([samples, int1(samples), int2(samples)]).T
 
 # Random values on an interval - uniformly sampled

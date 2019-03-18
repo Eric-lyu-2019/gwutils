@@ -32,7 +32,7 @@
 #either expressed or implied, of the FreeBSD Project.
 
 
-from __future__ import print_function, absolute_import
+from __future__ import absolute_import
 
 import logging
 import math
@@ -55,8 +55,8 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
            smooth=None, smooth1d=None,
            labels=None, label_kwargs=None,
            show_histograms=True, show_titles=False, title_fmt=".2f", title_kwargs=None,
-           truths=None, truth_color="#4682b4",
-           scale_hist=False, quantiles=None, verbose=False, fig=None,
+           truths=None, add_truths=None, truth_color="#4682b4", add_truth_colors=None, cov_color=None,
+           scale_hist=False, quantiles=None, show_quantiles=True, verbose=False, figaxes=None,
            max_n_ticks=5, top_ticks=False, use_math_text=False,
            hist_kwargs=None, **hist2d_kwargs):
     """
@@ -213,12 +213,15 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
         # If any of the extents are percentiles, convert them to ranges.
         # Also make sure it's a normal list.
         params_range = list(params_range)
-        for i, _ in enumerate(params_range):
-            try:
-                emin, emax = params_range[i]
-            except TypeError:
-                q = [0.5 - 0.5*params_range[i], 0.5 + 0.5*params_range[i]]
-                params_range[i] = quantile(xs[i], q, weights=weights)
+        for i, pr in enumerate(params_range):
+            if pr is None:
+                params_range[i] = [xs[i].min(), xs[i].max()]
+            else:
+                try:
+                    emin, emax = params_range[i]
+                except TypeError:
+                    q = [0.5 - 0.5*params_range[i], 0.5 + 0.5*params_range[i]]
+                    params_range[i] = quantile(xs[i], q, weights=weights)
 
     if len(params_range) != xs.shape[0]:
         raise ValueError("Dimension mismatch between samples and params_range")
@@ -244,14 +247,19 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
     dim = lbdim + plotdim + trdim
 
     # Create a new figure if one wasn't provided.
-    if fig is None:
+    # if fig is None:
+    #     fig, axes = pl.subplots(nplot, nplot, figsize=(dim, dim))
+    # else:
+    #     print(type(fig.axes))
+    #     try:
+    #         axes = np.array(fig.axes).reshape((nplot, nplot))
+    #     except:
+    #         raise ValueError("Provided figure has {0} axes, but data has "
+    #                          "dimensions K={1}".format(len(fig.axes), nplot))
+    if figaxes is None:
         fig, axes = pl.subplots(nplot, nplot, figsize=(dim, dim))
     else:
-        try:
-            axes = np.array(fig.axes).reshape((nplot, nplot))
-        except:
-            raise ValueError("Provided figure has {0} axes, but data has "
-                             "dimensions K={1}".format(len(fig.axes), nplot))
+        fig, axes = figaxes
 
 
     #idea is to pass in covariance, otherwise concoct something from the 1-sigma range.
@@ -289,12 +297,12 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
                 ax = axes[i, i]
             # Plot the histograms.
             if smooth1d is None:
-                n, _, _ = ax.hist(x, bins=bins[i], weights=weights,
+                n, _, _ = ax.hist(x, bins=bins[i], weights=weights, density=True,
                                   range=np.sort(params_range[i]), **hist_kwargs)
             else:
                 if gaussian_filter is None:
                     raise ImportError("Please install scipy for smoothing")
-                n, b = np.histogram(x, bins=bins[i], weights=weights,
+                n, b = np.histogram(x, bins=bins[i], weights=weights, density=True,
                                     range=np.sort(params_range[i]))
                 n = gaussian_filter(n, smooth1d)
                 x0 = np.array(list(zip(b[:-1], b[1:]))).flatten()
@@ -304,15 +312,22 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
             if truths is not None and truths[i] is not None:
                 ax.axvline(truths[i], color=truth_color)
 
-            # Plot quantiles if wanted.
-            if len(quantiles) > 0:
-                qvalues = quantile(x, quantiles, weights=weights)
-                for q in qvalues:
-                    ax.axvline(q, ls="dashed", color=color)
+            if add_truths is not None:
+                for add_truth, add_truth_color in zip(add_truths, add_truth_colors):
+                     if add_truth[i] is not None:
+                         ax.axvline(add_truth[i], color=add_truth_color)
 
-                if verbose:
-                    print("Quantiles:")
-                    print([item for item in zip(quantiles, qvalues)])
+            # Plot quantiles if wanted.
+            if show_quantiles:
+                if len(quantiles) > 0:
+                    qvalues = quantile(x, quantiles, weights=weights)
+                    for q in qvalues:
+                        ax.axvline(q, ls="dashed", color=color)
+
+                    if verbose:
+                        print "Quantiles:"
+                        for item in zip(quantiles, qvalues):
+                            print item
 
             if show_titles:
                 title = None
@@ -385,33 +400,64 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
                        color=color, smooth=smooth, bins=[bins[j], bins[i]],
                        **hist2d_kwargs)
 
-                #try to add an error ellipse
+                # Add an error ellipse based on the provided covariance matrix
                 if cov is not None:
+                    # #center
+                    # cx=truths[j]#need to add checking for availability of truths?
+                    # cy=truths[i]
+                    # #ang=math.acos(cov[0,1]/math.sqrt(cov[0,0]*cov[1,1]))*180/math.pi
+                    # print (j,i,labels[j],labels[i],"center=",cx,cy)
+                    # N_thetas=60
+                    # dtheta=2.0*math.pi/(N_thetas-1)
+                    # thetas=np.arange(0,(2.0*math.pi+dtheta),dtheta)
+                    # Cplus=(cov[i,i]+cov[j,j])/2.0
+                    # Cminus=(-cov[i,i]+cov[j,j])/2.0
+                    # print("cov[ii],cov[ij],cov[jj],Cplus,Cminus:",cov[i,i],cov[i,j],cov[j,j],Cplus,Cminus)
+                    # ang=-math.pi/4.
+                    # root=cov[i,j]/math.sqrt(cov[i,i]*cov[j,j])
+                    # acoeff=math.sqrt(1-root)
+                    # bcoeff=math.sqrt(1+root)
+                    # xcoeff=math.sqrt(cov[j,j])
+                    # ycoeff=math.sqrt(cov[i,i])
+                    # print("a2,b2",acoeff*acoeff,bcoeff*bcoeff)
+                    # print("a,b,ang, xcoeff,ycoeff, root=",acoeff,bcoeff,ang,xcoeff,ycoeff,root)
+                    # elxs=[cx+xcoeff*(acoeff*math.cos(th)*math.cos(ang)-bcoeff*math.sin(th)*math.sin(ang)) for th in thetas]
+                    # elys=[cy+ycoeff*(acoeff*math.cos(th)*math.sin(ang)+bcoeff*math.sin(th)*math.cos(ang)) for th in thetas]
+                    # #print (thetas)
+                    # #print (elxs)
+                    # #print (elys)
+                    # ax.plot(elxs,elys,color='r')
+                    #
                     #center
-                    cx=truths[j]#need to add checking for availability of truths?
-                    cy=truths[i]
-                    #ang=math.acos(cov[0,1]/math.sqrt(cov[0,0]*cov[1,1]))*180/math.pi
-                    print (j,i,labels[j],labels[i],"center=",cx,cy)
-                    N_thetas=60
-                    dtheta=2.0*math.pi/(N_thetas-1)
-                    thetas=np.arange(0,(2.0*math.pi+dtheta),dtheta)
-                    Cplus=(cov[i,i]+cov[j,j])/2.0
-                    Cminus=(-cov[i,i]+cov[j,j])/2.0
-                    print("cov[ii],cov[ij],cov[jj],Cplus,Cminus:",cov[i,i],cov[i,j],cov[j,j],Cplus,Cminus)
-                    ang=-math.pi/4.
-                    root=cov[i,j]/math.sqrt(cov[i,i]*cov[j,j])
-                    acoeff=math.sqrt(1-root)
-                    bcoeff=math.sqrt(1+root)
-                    xcoeff=math.sqrt(cov[j,j])
-                    ycoeff=math.sqrt(cov[i,i])
-                    print("a2,b2",acoeff*acoeff,bcoeff*bcoeff)
-                    print("a,b,ang, xcoeff,ycoeff, root=",acoeff,bcoeff,ang,xcoeff,ycoeff,root)
-                    elxs=[cx+xcoeff*(acoeff*math.cos(th)*math.cos(ang)-bcoeff*math.sin(th)*math.sin(ang)) for th in thetas]
-                    elys=[cy+ycoeff*(acoeff*math.cos(th)*math.sin(ang)+bcoeff*math.sin(th)*math.cos(ang)) for th in thetas]
-                    #print (thetas)
-                    #print (elxs)
-                    #print (elys)
-                    ax.plot(elxs,elys,color='r')
+                    cx = truths[j] # need to add checking for availability of truths?
+                    cy = truths[i]
+                    N_thetas = 60
+                    dtheta = 2.0*math.pi/(N_thetas-1)
+                    thetas = np.arange(0,(2.0*math.pi+dtheta),dtheta)
+                    ang = -math.pi/4.
+                    root = cov[i,j]/math.sqrt(cov[i,i]*cov[j,j])
+                    if(root>1): root = 1
+                    if(root<-1): root = -1
+                    acoeff = math.sqrt(1-root)
+                    bcoeff = math.sqrt(1+root)
+                    xcoeff = math.sqrt(cov[j,j])
+                    ycoeff = math.sqrt(cov[i,i])
+                    if "levels" in hist2d_kwargs:
+                        levels= hist2d_kwargs["levels"]
+                    else:
+                        levels== 1.0 - np.exp(-0.5 * np.arange(0.5, 2.1, 0.5) ** 2)
+                    for xlev in levels:
+                        # in the next line we convert the credibility limit
+                        # to a "sigma" limit for a 2-d normal
+                        # this becomes a scale-factor for the error ellipse
+                        # 1-exp(x^2/(-2)=y
+                        # -2*log(1-y)=x^2
+                        lev_fac = math.sqrt( -2 * math.log( 1 - xlev ) )
+                        elxs = [cx+lev_fac*xcoeff*(acoeff*math.cos(th)*math.cos(ang)-bcoeff*math.sin(th)*math.sin(ang)) for th in thetas]
+                        elys = [cy+lev_fac*ycoeff*(acoeff*math.cos(th)*math.sin(ang)+bcoeff*math.sin(th)*math.cos(ang)) for th in thetas]
+                        if cov_color is None:
+                            cov_color='k'
+                        ax.plot(elxs, elys, color=cov_color)
 
                 if truths is not None:
                     if truths[i] is not None and truths[j] is not None:
@@ -420,6 +466,16 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
                         ax.axvline(truths[j], color=truth_color)
                     if truths[i] is not None:
                         ax.axhline(truths[i], color=truth_color)
+
+                if add_truths is not None:
+                    for add_truth, add_truth_color in zip(add_truths, add_truth_colors):
+                        print add_truth
+                        if add_truth[i] is not None and add_truth[j] is not None:
+                            ax.plot(add_truth[j], add_truth[i], "s", color=add_truth_color)
+                        if add_truth[j] is not None:
+                            ax.axvline(add_truth[j], color=add_truth_color)
+                        if add_truth[i] is not None:
+                            ax.axhline(add_truth[i], color=add_truth_color)
 
                 ax.xaxis.set_major_locator(MaxNLocator(max_n_ticks, prune="lower"))
                 ax.yaxis.set_major_locator(MaxNLocator(max_n_ticks, prune="lower"))
@@ -450,21 +506,16 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
 
     # If not asking for the histograms to be plotted
     else:
-        print("K=" + str(K))
         for i, x in enumerate(xs):
             if i==0:
                 continue
-            print(i)
             # Deal with masked arrays.
             if hasattr(x, "compressed"):
                 x = x.compressed()
 
             for j, y in enumerate(xs):
-                print((i,j))
                 if j==K-1:
                     continue
-                print((i,j))
-                print(np.shape(xs)[0])
                 if np.shape(xs)[0] == 2:
                     ax = axes
                 else:
@@ -477,8 +528,6 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
                 elif j == i:
                     continue
 
-                print((i,j))
-
                 # Deal with masked arrays.
                 if hasattr(y, "compressed"):
                     y = y.compressed()
@@ -487,32 +536,64 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
                        color=color, smooth=smooth, bins=[bins[j], bins[i]],
                        **hist2d_kwargs)
 
-                #try to add an error ellipse
-                #center
-                cx=truths[j]#need to add checking for availability of truths?
-                cy=truths[i]
-                #ang=math.acos(cov[0,1]/math.sqrt(cov[0,0]*cov[1,1]))*180/math.pi
-                print (j,i,labels[j],labels[i],"center=",cx,cy)
-                N_thetas=60
-                dtheta=2.0*math.pi/(N_thetas-1)
-                thetas=np.arange(0,(2.0*math.pi+dtheta),dtheta)
-                Cplus=(cov[i,i]+cov[j,j])/2.0
-                Cminus=(-cov[i,i]+cov[j,j])/2.0
-                print("cov[ii],cov[ij],cov[jj],Cplus,Cminus:",cov[i,i],cov[i,j],cov[j,j],Cplus,Cminus)
-                ang=-math.pi/4.
-                root=cov[i,j]/math.sqrt(cov[i,i]*cov[j,j])
-                acoeff=math.sqrt(1-root)
-                bcoeff=math.sqrt(1+root)
-                xcoeff=math.sqrt(cov[j,j])
-                ycoeff=math.sqrt(cov[i,i])
-                print("a2,b2",acoeff*acoeff,bcoeff*bcoeff)
-                print("a,b,ang, xcoeff,ycoeff, root=",acoeff,bcoeff,ang,xcoeff,ycoeff,root)
-                elxs=[cx+xcoeff*(acoeff*math.cos(th)*math.cos(ang)-bcoeff*math.sin(th)*math.sin(ang)) for th in thetas]
-                elys=[cy+ycoeff*(acoeff*math.cos(th)*math.sin(ang)+bcoeff*math.sin(th)*math.cos(ang)) for th in thetas]
-                #print (thetas)
-                #print (elxs)
-                #print (elys)
-                ax.plot(elxs,elys,color='r')
+                # Add an error ellipse based on the provided covariance matrix
+                if cov is not None:
+                    # #center
+                    # cx=truths[j]#need to add checking for availability of truths?
+                    # cy=truths[i]
+                    # #ang=math.acos(cov[0,1]/math.sqrt(cov[0,0]*cov[1,1]))*180/math.pi
+                    # print (j,i,labels[j],labels[i],"center=",cx,cy)
+                    # N_thetas=60
+                    # dtheta=2.0*math.pi/(N_thetas-1)
+                    # thetas=np.arange(0,(2.0*math.pi+dtheta),dtheta)
+                    # Cplus=(cov[i,i]+cov[j,j])/2.0
+                    # Cminus=(-cov[i,i]+cov[j,j])/2.0
+                    # print("cov[ii],cov[ij],cov[jj],Cplus,Cminus:",cov[i,i],cov[i,j],cov[j,j],Cplus,Cminus)
+                    # ang=-math.pi/4.
+                    # root=cov[i,j]/math.sqrt(cov[i,i]*cov[j,j])
+                    # acoeff=math.sqrt(1-root)
+                    # bcoeff=math.sqrt(1+root)
+                    # xcoeff=math.sqrt(cov[j,j])
+                    # ycoeff=math.sqrt(cov[i,i])
+                    # print("a2,b2",acoeff*acoeff,bcoeff*bcoeff)
+                    # print("a,b,ang, xcoeff,ycoeff, root=",acoeff,bcoeff,ang,xcoeff,ycoeff,root)
+                    # elxs=[cx+xcoeff*(acoeff*math.cos(th)*math.cos(ang)-bcoeff*math.sin(th)*math.sin(ang)) for th in thetas]
+                    # elys=[cy+ycoeff*(acoeff*math.cos(th)*math.sin(ang)+bcoeff*math.sin(th)*math.cos(ang)) for th in thetas]
+                    # #print (thetas)
+                    # #print (elxs)
+                    # #print (elys)
+                    # ax.plot(elxs,elys,color='r')
+                    #
+                    #center
+                    cx = truths[j] # need to add checking for availability of truths?
+                    cy = truths[i]
+                    N_thetas = 60
+                    dtheta = 2.0*math.pi/(N_thetas-1)
+                    thetas = np.arange(0,(2.0*math.pi+dtheta),dtheta)
+                    ang = -math.pi/4.
+                    root = cov[i,j]/math.sqrt(cov[i,i]*cov[j,j])
+                    if(root>1): root = 1
+                    if(root<-1): root = -1
+                    acoeff = math.sqrt(1-root)
+                    bcoeff = math.sqrt(1+root)
+                    xcoeff = math.sqrt(cov[j,j])
+                    ycoeff = math.sqrt(cov[i,i])
+                    if "levels" in hist2d_kwargs:
+                        levels= hist2d_kwargs["levels"]
+                    else:
+                        levels== 1.0 - np.exp(-0.5 * np.arange(0.5, 2.1, 0.5) ** 2)
+                    for xlev in levels:
+                        # in the next line we convert the credibility limit
+                        # to a "sigma" limit for a 2-d normal
+                        # this becomes a scale-factor for the error ellipse
+                        # 1-exp(x^2/(-2)=y
+                        # -2*log(1-y)=x^2
+                        lev_fac = math.sqrt( -2 * math.log( 1 - xlev ) )
+                        elxs = [cx+lev_fac*xcoeff*(acoeff*math.cos(th)*math.cos(ang)-bcoeff*math.sin(th)*math.sin(ang)) for th in thetas]
+                        elys = [cy+lev_fac*ycoeff*(acoeff*math.cos(th)*math.sin(ang)+bcoeff*math.sin(th)*math.cos(ang)) for th in thetas]
+                        if cov_color is None:
+                            cov_color='k'
+                        ax.plot(elxs, elys, color=cov_color)
 
                 if truths is not None:
                     if truths[i] is not None and truths[j] is not None:
@@ -521,6 +602,16 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
                         ax.axvline(truths[j], color=truth_color)
                     if truths[i] is not None:
                         ax.axhline(truths[i], color=truth_color)
+
+                if add_truths is not None:
+                    for add_truth, add_truth_color in zip(add_truths, add_truth_colors):
+                        print add_truth
+                        if add_truth[i] is not None and add_truth[j] is not None:
+                            ax.plot(add_truth[j], add_truth[i], "s", color=add_truth_color)
+                        if add_truth[j] is not None:
+                            ax.axvline(add_truth[j], color=add_truth_color)
+                        if add_truth[i] is not None:
+                            ax.axhline(add_truth[i], color=add_truth_color)
 
                 ax.xaxis.set_major_locator(MaxNLocator(max_n_ticks, prune="lower"))
                 ax.yaxis.set_major_locator(MaxNLocator(max_n_ticks, prune="lower"))
@@ -549,7 +640,7 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
                     ax.yaxis.set_major_formatter(
                         ScalarFormatter(useMathText=use_math_text))
 
-    return fig
+    return fig, axes
 
 
 def quantile(x, q, weights=None):
