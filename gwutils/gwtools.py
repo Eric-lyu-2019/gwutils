@@ -13,6 +13,7 @@ from math import pi, factorial
 from numpy import array, conjugate, dot, sqrt, cos, sin, tan, exp, real, imag, arccos, arcsin, arctan, arctan2
 import scipy
 import scipy.interpolate as ip
+from scipy.interpolate import InterpolatedUnivariateSpline as spline
 import scipy.optimize as op
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -27,9 +28,10 @@ import Quaternions
 #from utils import *
 
 # Cubic spline interpolation
-# Note that the defaults ext=2 forbids any extrapolation - return ValueError in that case
-def spline(x, y, k=3, ext=2):
-    return ip.InterpolatedUnivariateSpline(x, y, k=k, ext=ext)
+# WARNING: Note that the defaults ext=0 allows extrapolation
+# Use ext=2 to forbid any extrapolation (including  when out-of-bounds by machine-precision errors...)
+# def spline(x, y, k=3, ext=0):
+#     return ip.InterpolatedUnivariateSpline(x, y, k=k, ext=ext)
 
 # Numerical values - taken from LAL for physical quantities, but pure numbers like pi are from numpy
 msols = 4.925491025543575903411922162094833998e-6
