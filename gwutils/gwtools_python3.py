@@ -1,5 +1,8 @@
 ## General tools
+## OUTDATED
 ## Hard copy of gwtools on 2018-02-20, commenting dependence on GWFrame and Quaternions for python3-compliance
+## GWFrame and Quaternions - dependent things have been moved to prectools.py
+## gwtools has been made python3-compliant, use it instead
 
 import sys
 import re
@@ -380,7 +383,6 @@ def fft_positivef(timeseries):
     deltat = timeseries[1,0] - timeseries[0,0]
     deltaf = 1./(n*deltat)
     #Fast Fourier Transform
-    #print 'FFT'
     frequencies = deltaf*np.arange(n)
     # Input values for the fft - accomodate for the real and complex cases
     if ncol==1:
@@ -553,6 +555,22 @@ def fold_list(xlist, n):
 #     colorblind=["#0072B2", "#009E73", "#D55E00",
 #                 "#CC79A7", "#F0E442", "#56B4E9"]
 #)
+rc_params = {'backend': 'ps',
+            'font.family': 'Times New Roman',
+            'font.sans-serif': ['Bitstream Vera Sans'],
+            'axes.unicode_minus':False,
+            'text.usetex':True,
+            'grid.linestyle':':',
+            'grid.linewidth':1.,
+            'axes.labelsize':16,
+            'axes.titlesize':16,
+            'xtick.labelsize':16,
+            'ytick.labelsize':16,
+            'legend.fontsize':16,
+            'figure.dpi':300}
+
+plt.rcParams.update(rc_params)
+
 plotpalette = ["#4C72B0", "#C44E52", "#CCB974", "#55A868", "#8172B2", "#64B5CD"]
 def lplot(ax, *args, **kwargs):
     rangex = kwargs.get('rangex', [])

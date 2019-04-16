@@ -31,13 +31,16 @@
 #of the authors and should not be interpreted as representing official policies,
 #either expressed or implied, of the FreeBSD Project.
 
+from __future__ import absolute_import, division, print_function
+import sys
+if sys.version_info[0] == 2:
+    from future_builtins import map, filter
 
-from __future__ import absolute_import
 
 import logging
 import math
 import numpy as np
-import matplotlib.pyplot as pl
+import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib.colors import LinearSegmentedColormap, colorConverter
 from matplotlib.ticker import ScalarFormatter
@@ -248,7 +251,7 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
 
     # Create a new figure if one wasn't provided.
     # if fig is None:
-    #     fig, axes = pl.subplots(nplot, nplot, figsize=(dim, dim))
+    #     fig, axes = plt.subplots(nplot, nplot, figsize=(dim, dim))
     # else:
     #     print(type(fig.axes))
     #     try:
@@ -257,7 +260,7 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
     #         raise ValueError("Provided figure has {0} axes, but data has "
     #                          "dimensions K={1}".format(len(fig.axes), nplot))
     if figaxes is None:
-        fig, axes = pl.subplots(nplot, nplot, figsize=(dim, dim))
+        fig, axes = plt.subplots(nplot, nplot, figsize=(dim, dim))
     else:
         fig, axes = figaxes
 
@@ -325,9 +328,9 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
                         ax.axvline(q, ls="dashed", color=color)
 
                     if verbose:
-                        print "Quantiles:"
+                        print("Quantiles:")
                         for item in zip(quantiles, qvalues):
-                            print item
+                            print(item)
 
             if show_titles:
                 title = None
@@ -469,7 +472,7 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
 
                 if add_truths is not None:
                     for add_truth, add_truth_color in zip(add_truths, add_truth_colors):
-                        print add_truth
+                        print(add_truth)
                         if add_truth[i] is not None and add_truth[j] is not None:
                             ax.plot(add_truth[j], add_truth[i], "s", color=add_truth_color)
                         if add_truth[j] is not None:
@@ -605,7 +608,7 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
 
                 if add_truths is not None:
                     for add_truth, add_truth_color in zip(add_truths, add_truth_colors):
-                        print add_truth
+                        print(add_truth)
                         if add_truth[i] is not None and add_truth[j] is not None:
                             ax.plot(add_truth[j], add_truth[i], "s", color=add_truth_color)
                         if add_truth[j] is not None:
@@ -747,7 +750,7 @@ def hist2d(x, y, bins=20, range=None, weights=None, levels=None, smooth=None,
 
     """
     if ax is None:
-        ax = pl.gca()
+        ax = plt.gca()
 
     # Set the default range based on the data range if not provided.
     if range is None:

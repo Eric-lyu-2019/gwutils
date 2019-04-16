@@ -2,6 +2,12 @@
 #0001-SEOBNRv3-expand-AttachParams-return-both-dynamics.patch
 #0002-SEOB-aligned-return-both-dynamics.patch
 
+from __future__ import absolute_import, division, print_function
+import sys
+if sys.version_info[0] == 2:
+    from future_builtins import map, filter
+
+
 import numpy as np
 import copy
 import math
@@ -833,7 +839,7 @@ def gen_SEOB(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0.
     #TEST
     # print 'before GWFrame'
     T_data = tI
-    LM_data = np.array(map(list, modes), dtype=np.int32)
+    LM_data = np.array(list(map(list, modes)), dtype=np.int32)
     mode_data = np.array([wf['hI'][lm] for lm in modes])
     W_v3 = GWFrames.Waveform(T_data, LM_data, mode_data)
     W_v3.SetFrameType(1);
@@ -849,7 +855,7 @@ def gen_SEOB(q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, Mf_min, inc=0., phi=0.
 
     # Time series for the dominant radiation vector
     quat = W_v3.Frame()
-    euler = np.array(map(gwtools.euler_from_quat, quat))
+    euler = np.array(list(map(gwtools.euler_from_quat, quat)))
     alpha = np.unwrap(euler[:,0])
     beta = euler[:,1]
     gamma = np.unwrap(euler[:,2])

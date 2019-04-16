@@ -1,6 +1,11 @@
 ## Tools for plotting
 
+from __future__ import absolute_import, division, print_function
 import sys
+if sys.version_info[0] == 2:
+    from future_builtins import map, filter
+
+
 import re
 import time
 import numpy as np
@@ -15,8 +20,9 @@ import scipy.optimize as op
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-import gwtools
-import corner_covar
+import gwutils.gwtools as gwtools
+import gwutils.corner_covar as corner_covar
+
 
 ####################################
 ## Functions to plot single waveform
@@ -92,7 +98,7 @@ def plot_wf_AIlm(wf, interval=[-400,150], exportpdf=False, pdffile='', showparam
         plt.show()
     else:
         if pdffile=='':
-            print "Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf."
+            raise ValueError("Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf.")
         else:
             f.savefig(pdffile, bbox_inches='tight')
             plt.close(f)
@@ -165,7 +171,7 @@ def plot_wf_phiIlm(wf, interval=[-400,150], exportpdf=False, pdffile='', showpar
         plt.show()
     else:
         if pdffile=='':
-            print "Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf."
+            raise ValueError("Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf.")
         else:
             f.savefig(pdffile, bbox_inches='tight')
             plt.close(f)
@@ -238,7 +244,7 @@ def plot_wf_APlm(wf, interval=[-400,150], exportpdf=False, pdffile='', showparam
         plt.show()
     else:
         if pdffile=='':
-            print "Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf."
+            raise ValueError("Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf.")
         else:
             f.savefig(pdffile, bbox_inches='tight')
             plt.close(f)
@@ -311,7 +317,7 @@ def plot_wf_phiPlm(wf, interval=[-400,150], exportpdf=False, pdffile='', showpar
         plt.show()
     else:
         if pdffile=='':
-            print "Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf."
+            raise ValueError("Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf.")
         else:
             f.savefig(pdffile, bbox_inches='tight')
             plt.close(f)
@@ -351,7 +357,7 @@ def plot_wf_euler(wf, interval=[-400,150], showQNM=True, exportpdf=False, pdffil
     # Show the GaTech model for the post-merger rotation of the GW frame around final J
     chif = gwtools.norm(wf['metadata']['chif'])
     if showQNM:
-        tpostmerger = np.array(filter(lambda x: x>=0, tPrestr))
+        tpostmerger = np.array(list(filter(lambda x: x>=0, tPrestr)))
         a3.plot(tpostmerger, alphaclosemerger + (gwtools.QNMomegalmnInt[(2,2,0)](chif)-gwtools.QNMomegalmnInt[(2,1,0)](chif))*(tpostmerger-talphaclosemerger), 'k:', label=r'$\omega^{\rm QNM}_{220} - \omega^{\rm QNM}_{210}$')
     minalpharestr = np.min(gwtools.restrict_data(tPeulerrestr, [interval[0], 0])[:,1]) # min value of alpha premerger on the restricted data
     maxalphaestimate = alphaclosemerger + (gwtools.QNMomegalmnInt[(2,2,0)](chif)-gwtools.QNMomegalmnInt[(2,1,0)](chif))*(interval[1]-talphaclosemerger) # estimate max value of alpha to plot from GaTech model
@@ -385,7 +391,7 @@ def plot_wf_euler(wf, interval=[-400,150], showQNM=True, exportpdf=False, pdffil
         plt.show()
     else:
         if pdffile=='':
-            print "Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf."
+            raise ValueError("Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf.")
         else:
             f.savefig(pdffile, bbox_inches='tight')
             plt.close(f)
@@ -464,7 +470,7 @@ def plot_wf_omegaIlm(wf, interval=[-400,150], showQNM=True, exportpdf=False, pdf
         plt.show()
     else:
         if pdffile=='':
-            print "Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf."
+            raise ValueError("Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf.")
         else:
             f.savefig(pdffile, bbox_inches='tight')
             plt.close(f)
@@ -543,7 +549,7 @@ def plot_wf_omegaPlm(wf, interval=[-400,150], showQNM=True, exportpdf=False, pdf
         plt.show()
     else:
         if pdffile=='':
-            print "Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf."
+            raise ValueError("Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf.")
         else:
             f.savefig(pdffile, bbox_inches='tight')
             plt.close(f)
@@ -566,8 +572,7 @@ def plot_wf_frame_compare_extrapolation(wfN4, wfN3, interval=[-400,150], showQNM
     alphaclosestmerger = wfN4['eulerVf'][iclosestmerger, 0]
     # Check extrapolation order of inputs
     if not (wfN4['extrapolation']=='N4' and wfN3['extrapolation']=='N3'):
-        print "Error in plot_wf_frame_compareextrapolation: extrapolation order tags do not match."
-        return
+        raise ValueError("Error in plot_wf_frame_compareextrapolation: extrapolation order tags do not match.")
     # Plotting Vf Cartesian components, Euler angles for the full waveform - plotted for N4
     wf = wfN4
     a1.plot(wf['tP'], wf['Vf'][:,0], 'b', label=r'$V_f^x$')
@@ -598,7 +603,7 @@ def plot_wf_frame_compare_extrapolation(wfN4, wfN3, interval=[-400,150], showQNM
     # Show the GaTech model for the post-merger rotation of the GW frame around final J
     if showQNM:
         chif = gwtools.norm(wfN4['metadata']['chif'])
-        tpostmerger = np.array(filter(lambda x: x>=0, tPrestr))
+        tpostmerger = np.array(list(filter(lambda x: x>=0, tPrestr)))
         a7.plot(tpostmerger, alphaclosestmerger + (QNMomegalmnInt[(2,2,0)](chif)-QNMomegalmnInt[(2,1,0)](chif))*tpostmerger, 'k:', label=r'$\omega^{\rm QNM}_{220} - \omega^{\rm QNM}_{210}$')
     a5.plot(tPrestr, Vfrestr[:,0], 'b', label=r'$V_f^x$ N4')
     a5.plot(tPrestr, Vfrestr[:,1], 'r', label=r'$V_f^y$ N3')
@@ -632,7 +637,7 @@ def plot_wf_frame_compare_extrapolation(wfN4, wfN3, interval=[-400,150], showQNM
         plt.show()
     else:
         if pdffile=='':
-            print "Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf."
+            raise ValueError("Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf.")
         else:
             f.savefig(pdffile, bbox_inches='tight')
             plt.close(f)
@@ -684,7 +689,7 @@ def plot_wf_Vf(wf, interval=[-400,150], showQNM=False, exportpdf=False, pdffile=
         plt.show()
     else:
         if pdffile=='':
-            print "Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf."
+            raise ValueError("Error in plot_wf_frame_compare_extrapolation: empty file name for export pdf.")
         else:
             f.savefig(pdffile, bbox_inches='tight')
             plt.close(f)
@@ -708,7 +713,7 @@ def convert_ptmcmc_params_Lframe(x, defLframe='paper', SetphiRefSSBAtfRef=False)
     xc[10] = psiL
     return xc
 def convert_ptmcmc_post_Lframe(posterior, defLframe='paper', SetphiRefSSBAtfRef=False):
-    return np.array(map(lambda x: convert_ptmcmc_params_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), posterior))
+    return np.array(list(map(lambda x: convert_ptmcmc_params_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), posterior)))
 # Function to convert ptmcmc-formatted posterior to bambi/multinest-formatted posterior
 def convert_ptmcmc_post_to_bambi(posterior):
     likes = posterior[:,1]
@@ -718,7 +723,7 @@ def convert_ptmcmc_post_to_bambi(posterior):
 def compute_massparams_post(post):
     M = post[:,0] + post[:,1]
     q = post[:,0] / post[:,1]
-    Mchirp = np.array(map(lambda x: gwtools.Mchirpofm1m2(x[0], x[1]), post))
+    Mchirp = np.array(list(map(lambda x: gwtools.Mchirpofm1m2(x[0], x[1]), post)))
     eta = post[:,0] * post[:,1] / (M * M)
     ext = np.array([M, q, Mchirp, eta]).T
     return np.concatenate((post, ext), axis=1)
@@ -752,7 +757,7 @@ def convert_params_Lframe(x, defLframe='paper', SetphiRefSSBAtfRef=False):
     xc[8] = psiL
     return xc
 def convert_post_Lframe(posterior, defLframe='paper', SetphiRefSSBAtfRef=False):
-    return np.array(map(lambda x: convert_params_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), posterior))
+    return np.array(list(map(lambda x: convert_params_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), posterior)))
 
 # Functions to parse a bambi .out file
 # Extract evolution of evidence and acceptance rate with the number of evaluations
@@ -761,7 +766,7 @@ def convert_post_Lframe(posterior, defLframe='paper', SetphiRefSSBAtfRef=False):
 
 # Functions to parse a _params.txt file, extracting injected parameters
 def linematchingsymbol(stringarr, symbol):
-    stringarrmatch = filter(lambda x: re.match(r"^ *" + re.escape(symbol) + r" *:", x) is not None, stringarr)
+    stringarrmatch = list(filter(lambda x: re.match(r"^ *" + re.escape(symbol) + r" *:", x) is not None, stringarr))
     if len(stringarrmatch) == 0:
         return ""
     elif len(stringarrmatch) > 1:
@@ -837,7 +842,7 @@ def load_post_separate_data(file):
         indices.append([start, end])
     arrfromfile = np.loadtxt(file)
     reslist = [(arrfromfile[ij[0]:ij[1]+1])[:,2:] for ij in indices] #Role unknown for the first two columns, not copied - the 9 others seem to correspond to parameters
-    return map(lambda x: compute_massparams_post(x), reslist)
+    return list(map(lambda x: compute_massparams_post(x), reslist))
 
 def load_post_data(file):
     #last column is logLikelihood, not copied
@@ -859,10 +864,8 @@ def read_covariance(file):
         i=0
         for par in pars:
             line=f.readline()
-            #print(i,":",line)
             covar[i]=np.array(line.split())
             i+=1
-        #print "done"
     return covar
 def read_fisher(file):
     pars=[]
@@ -879,10 +882,8 @@ def read_fisher(file):
         i=0
         for par in pars:
             line=f.readline()
-            #print(i,":",line)
             covar[i]=np.array(line.split())
             i+=1
-        #print "done"
     return covar
 # Convert SSB-frame covariance to L-frame
 # Fisher matrix : if J_{a',b} = \partial xL^a' / \partial x^b Jacobian matrix
@@ -912,7 +913,7 @@ def compute_posterior(posterior, flatdistprior=False, logflatmassprior=False):
     elif not flatdistprior and not logflatmassprior:
         def prior(x):
             return  x[3]**2 * np.sin(x[5]) * np.cos(x[7])
-    priorvalues = np.array(map(prior, posterior))
+    priorvalues = np.array(list(map(prior, posterior)))
     # normalize (arbitrarily) to the prior value of highest likelihood (injection)
     priorvalues = priorvalues / priorvalues[0]
     posteriorvalues = np.log(priorvalues) + posterior[:,9]
@@ -1055,7 +1056,7 @@ def corner_plot(injparams, posterior, add_posteriors=None, output=False, output_
         injparams = convert_params_Lframe(injparams, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
         posterior = convert_post_Lframe(posterior, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
         if add_posteriors is not None:
-            add_posteriors = map(lambda x: convert_post_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), add_posteriors)
+            add_posteriors = list(map(lambda x: convert_post_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), add_posteriors))
 
     # If not provided, determine automatically scales [M, D, t]
     if not scales:
@@ -1067,17 +1068,17 @@ def corner_plot(injparams, posterior, add_posteriors=None, output=False, output_
     injparams_scaled = scale_injparams(injparams, scalefactors)
     posterior_scaled = scale_posterior(posterior, scalefactors)
     if add_posteriors is not None:
-        add_posteriors = map(lambda x: scale_posterior(x, scalefactors), add_posteriors)
+        add_posteriors = list(map(lambda x: scale_posterior(x, scalefactors), add_posteriors))
 
     # Posterior and injection parameters for the ordered set of params required
     parmap = paramsmap(detector)
-    ordered_cols = map(parmap.get, params)
+    ordered_cols = list(map(parmap.get, params))
     ordered_posterior = posterior_scaled[:,ordered_cols]
     ordered_injparams = injparams_scaled[ordered_cols]
     if add_posteriors is not None:
-        ordered_add_posteriors = map(lambda x: x[:,ordered_cols], add_posteriors)
+        ordered_add_posteriors = list(map(lambda x: x[:,ordered_cols], add_posteriors))
     if add_truths is not None:
-        ordered_add_truths = map(lambda x: x[ordered_cols], add_truths)
+        ordered_add_truths = list(map(lambda x: x[ordered_cols], add_truths))
     else:
         ordered_add_truths = None
 
@@ -1099,7 +1100,7 @@ def corner_plot(injparams, posterior, add_posteriors=None, output=False, output_
 
     # Main call to corner function
     label_dict = param_label_dict(detector, scales_val, Lframe)
-    labels = map(lambda x: label_dict[x], params)
+    labels = list(map(lambda x: label_dict[x], params))
     fig, axes = corner_covar.corner(ordered_posterior, cov=cov, bins=bins, params_range=params_range, levels=levels,
                                  labels=labels, label_kwargs=label_kwargs, color=color,
                                  truths=ordered_injparams, add_truths=ordered_add_truths, truth_color=truth_color, add_truth_colors=add_truth_colors, plot_datapoints=plot_datapoints,
