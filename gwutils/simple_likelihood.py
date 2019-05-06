@@ -1,3 +1,5 @@
+# DEPRECATED -- see lisatools.py instead
+
 import sys
 import re
 import time
