@@ -321,7 +321,11 @@ def LISASNR_AET_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, 
     SNR_AET_arr = np.zeros((N,4))
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
-        SNR_AET_arr[i] = LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0, fRef=fRef, npts=npts, variant=variant)
+        if t0=='av':
+            t0val = np.random.uniform(low=0., high=1.)
+        else:
+            t0val = t0
+        SNR_AET_arr[i] = LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
     SNR_av = np.mean(SNR_AET_arr[:,0])
     SNR_A_av = np.mean(SNR_AET_arr[:,1])
     SNR_E_av = np.mean(SNR_AET_arr[:,2])
@@ -332,7 +336,11 @@ def LISASNR_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf
     SNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
-        SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0, fRef=fRef, npts=npts, variant=variant)
+        if t0=='av':
+            t0val = np.random.uniform(low=0., high=1.)
+        else:
+            t0val = t0
+        SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
     SNR_av = np.mean(SNR_arr)
     return SNR_av
 
@@ -342,7 +350,11 @@ def LISASNR_AET_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1.
         phi, inc, lambd, beta, psi = draw_random_angles()
         chi1 = np.random.uniform(low=-1., high=1.)
         chi2 = np.random.uniform(low=-1., high=1.)
-        SNR_AET_arr[i] = LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0, fRef=fRef, npts=npts, variant=variant)
+        if t0=='av':
+            t0val = np.random.uniform(low=0., high=1.)
+        else:
+            t0val = t0
+        SNR_AET_arr[i] = LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
     SNR_av = np.mean(SNR_AET_arr[:,0])
     SNR_A_av = np.mean(SNR_AET_arr[:,1])
     SNR_E_av = np.mean(SNR_AET_arr[:,2])
@@ -355,7 +367,11 @@ def LISASNR_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0
         phi, inc, lambd, beta, psi = draw_random_angles()
         chi1 = np.random.uniform(low=-1., high=1.)
         chi2 = np.random.uniform(low=-1., high=1.)
-        SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0, fRef=fRef, npts=npts, variant=variant)
+        if t0=='av':
+            t0val = np.random.uniform(low=0., high=1.)
+        else:
+            t0val = t0
+        SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
     SNR_av = np.mean(SNR_arr)
     return SNR_av
 
@@ -401,6 +417,24 @@ def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=
     tSNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
-        tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0, fRef=fRef, npts=npts, variant=variant)
+        if t0=='av':
+            t0val = np.random.uniform(low=0., high=1.)
+        else:
+            t0val = t0
+        tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
+    tSNR_av = np.mean(tSNR_arr)
+    return tSNR_av
+
+def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal'):
+    tSNR_arr = np.zeros(N)
+    for i in range(N):
+        phi, inc, lambd, beta, psi = draw_random_angles()
+        chi1 = np.random.uniform(low=-1., high=1.)
+        chi2 = np.random.uniform(low=-1., high=1.)
+        if t0=='av':
+            t0val = np.random.uniform(low=0., high=1.)
+        else:
+            t0val = t0
+        tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
     tSNR_av = np.mean(tSNR_arr)
     return tSNR_av
