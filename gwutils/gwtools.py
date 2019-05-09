@@ -255,6 +255,10 @@ def cumulative_trapeze(data):
 def logspace(start, stop, nb):
     ratio = (stop/start)**(1./(nb-1))
     return start * np.power(ratio, np.arange(nb))
+# Sqrt sampling
+def sqrtspace(start, stop, nb):
+    sqrtvals = np.linspace(np.sqrt(start), np.sqrt(stop), nb)
+    return np.power(sqrtvals, 2)
 
 # Resample waveform (either Re/Im or Amp/Phase) on input samples
 def resample(wf, samples):

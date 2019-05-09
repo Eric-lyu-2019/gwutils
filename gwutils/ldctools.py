@@ -425,13 +425,18 @@ def LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, 
     last_tf = tf[ilast_tf]
     margin = 1. # Margin for representing ln(tflast - tf + margin)
 
-    # Detectability threshold at SNR=10
-    if not np.any(cumul_SNR < SNR):
-        #print('Warning: cumul_SNR exceeds threshold at first point ?')
-        ithreshold = 0
+    # Detectability threshold
+    if not np.any(cumul_SNR > SNR):
+        #print('Warning: cumul_SNR does not reach threshold.')
+        tthreshold = np.nan
     else:
-        ithreshold = np.where(cumul_SNR < SNR)[0][-1]
-    tthreshold = last_tf - tf[ithreshold] + margin
+        if not np.any(cumul_SNR < SNR):
+            #print('Warning: cumul_SNR exceeds threshold at first point ?')
+            ithreshold = 0
+
+        else:
+            ithreshold = np.where(cumul_SNR < SNR)[0][-1]
+        tthreshold = last_tf - tf[ithreshold] + margin
 
     return tthreshold
 
