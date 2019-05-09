@@ -317,7 +317,7 @@ def draw_random_angles():
     psi = np.random.uniform(low=0., high=np.pi)
     return np.array([phi, inc, lambd, beta, psi])
 
-def LISASNR_AET_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal'):
+def LISASNR_AET_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False):
     SNR_AET_arr = np.zeros((N,4))
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -330,9 +330,16 @@ def LISASNR_AET_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, 
     SNR_A_av = np.mean(SNR_AET_arr[:,1])
     SNR_E_av = np.mean(SNR_AET_arr[:,2])
     SNR_T_av = np.mean(SNR_AET_arr[:,3])
-    return np.array([SNR_av, SNR_A_av, SNR_E_av, SNR_T_av])
+    SNR_std = np.std(SNR_AET_arr[:,0])
+    SNR_A_std = np.std(SNR_AET_arr[:,1])
+    SNR_E_std = np.std(SNR_AET_arr[:,2])
+    SNR_T_std = np.std(SNR_AET_arr[:,3])
+    if not return_std:
+        return np.array([SNR_av, SNR_A_av, SNR_E_av, SNR_T_av])
+    else:
+        return np.array([SNR_av, SNR_A_av, SNR_E_av, SNR_T_av]), np.array([SNR_std, SNR_A_std, SNR_E_std, SNR_T_std])
 
-def LISASNR_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal'):
+def LISASNR_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False):
     SNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -342,9 +349,13 @@ def LISASNR_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf
             t0val = t0
         SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
     SNR_av = np.mean(SNR_arr)
-    return SNR_av
+    SNR_std = np.std(SNR_arr)
+    if not return_std:
+        return SNR_av
+    else:
+        return SNR_av, SNR_std
 
-def LISASNR_AET_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal'):
+def LISASNR_AET_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False):
     SNR_AET_arr = np.zeros((N,4))
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -359,9 +370,16 @@ def LISASNR_AET_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1.
     SNR_A_av = np.mean(SNR_AET_arr[:,1])
     SNR_E_av = np.mean(SNR_AET_arr[:,2])
     SNR_T_av = np.mean(SNR_AET_arr[:,3])
-    return np.array([SNR_av, SNR_A_av, SNR_E_av, SNR_T_av])
+    SNR_std = np.std(SNR_AET_arr[:,0])
+    SNR_A_std = np.std(SNR_AET_arr[:,1])
+    SNR_E_std = np.std(SNR_AET_arr[:,2])
+    SNR_T_std = np.std(SNR_AET_arr[:,3])
+    if not return_std:
+        return np.array([SNR_av, SNR_A_av, SNR_E_av, SNR_T_av])
+    else:
+        return np.array([SNR_av, SNR_A_av, SNR_E_av, SNR_T_av]), np.array([SNR_std, SNR_A_std, SNR_E_std, SNR_T_std])
 
-def LISASNR_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal'):
+def LISASNR_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False):
     SNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -373,7 +391,11 @@ def LISASNR_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0
             t0val = t0
         SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
     SNR_av = np.mean(SNR_arr)
-    return SNR_av
+    SNR_std = np.std(SNR_arr)
+    if not return_std:
+        return SNR_av
+    else:
+        return SNR_av, SNR_std
 
 ################################################################################
 # Time to merger
@@ -413,7 +435,7 @@ def LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, 
 
     return tthreshold
 
-def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal'):
+def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False):
     tSNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -423,9 +445,13 @@ def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=
             t0val = t0
         tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
     tSNR_av = np.mean(tSNR_arr)
-    return tSNR_av
+    tSNR_std = np.std(tSNR_arr)
+    if not return_std:
+        return tSNR_av
+    else:
+        return tSNR_av, tSNR_std
 
-def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal'):
+def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False):
     tSNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -437,4 +463,8 @@ def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., min
             t0val = t0
         tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
     tSNR_av = np.mean(tSNR_arr)
-    return tSNR_av
+    tSNR_std = np.std(tSNR_arr)
+    if not return_std:
+        return tSNR_av
+    else:
+        return tSNR_av, tSNR_std
