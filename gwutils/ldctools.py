@@ -440,7 +440,7 @@ def LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, 
 
     return tthreshold
 
-def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False):
+def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False, ignore_nan=False):
     tSNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -449,6 +449,11 @@ def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=
         else:
             t0val = t0
         tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
+    if ignore_nan:
+        mask = np.logical_not(np.isnan(tSNR_arr))
+        tSNR_arr = tSNR_arr[mask]
+        if len(tSNR_arr)==0:
+            return np.nan, np.nan
     tSNR_av = np.mean(tSNR_arr)
     tSNR_std = np.std(tSNR_arr)
     if not return_std:
@@ -456,7 +461,7 @@ def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=
     else:
         return tSNR_av, tSNR_std
 
-def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False):
+def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False, ignore_nan=False):
     tSNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -467,6 +472,11 @@ def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., min
         else:
             t0val = t0
         tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant)
+    if ignore_nan:
+        mask = np.logical_not(np.isnan(tSNR_arr))
+        tSNR_arr = tSNR_arr[mask]
+        if len(tSNR_arr)==0:
+            return np.nan, np.nan
     tSNR_av = np.mean(tSNR_arr)
     tSNR_std = np.std(tSNR_arr)
     if not return_std:
