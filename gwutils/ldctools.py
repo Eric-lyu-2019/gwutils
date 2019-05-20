@@ -59,6 +59,23 @@ def SopLISA2017(f):
     Sop=Dop2*ddtsq/C2; #//f^2 coeff for OP frac-freq noise PSD.  Yields 1.76e-37 for Dop=2e-11.
     return Sop;
 
+#/* Proof mass and optic noises - f in Hz */
+#/* Taken from (4) in McWilliams&al_0911 */
+def SpmLISA2010(f):
+    invf2 = 1./(f*f);
+    #//return 2.5e-48 * invf2 * sqrt(1. + 1e-8*invf2);
+    #//const double Daccel=3.0e-15; //acceleration noise in m/s^2/sqrt(Hz)
+    Daccel=3.0e-15; #//scaled off L3LISA-v1 to for equal-SNR PE experiment
+    SaccelFF=Daccel*Daccel/4.0/np.pi/np.pi/gwtools.c/gwtools.c; #//f^-2 coeff for fractional-freq noise PSD from accel noise; yields 2.54e-48 from 3e-15;
+    invf8=invf2*invf2*invf2*invf2;
+    #//Here we add an eyeball approximation based on 4yrs integration with L3LISAReferenceMission looking at a private comm from Neil Cornish 2016.11.12
+    WDWDnoise=5000.0/sqrt(1e-21*invf8 + invf2 + 3e28/invf8)*SaccelFF*invf2;
+    return SaccelFF * invf2 * sqrt(1. + 1e-8*invf2) + WDWDnoise;
+def SopLISA2010(f):
+    Dop=2.0e-11; #//Optical path noise in m/rtHz (Standard LISA)
+    SopFF=Dop*Dop*4.0*np.pi*np.pi/gwtools.c/gwtools.c; #//f^2 coeff for OP frac-freq noise PSD.  Yields 1.76e-37 for Dop=2e-11.
+    return SopFF * f * f;
+
 #/* Proof mass and optical noises - f in Hz */
 #/* LISA Proposal, copied from the LISA Data Challenge pipeline */
 def SpmLISAProposal(f):
@@ -106,32 +123,13 @@ def SopLISASciRDv1(f):
     Sop = Soms_nu
     return Sop
 
-def SpmLISAProposal(f):
-    #/* Acceleration noise */
-    noise_Sa_a = 9.e-30; #/* m^2/sec^4 /Hz */
-    #/* In acceleration */
-    Sa_a = noise_Sa_a * (1.0 + np.power(0.4e-3/f, 2)) * (1.0 + np.power((f/8e-3), 4));
-    #/* In displacement */
-    Sa_d = Sa_a * pow(2.*np.pi*f, -4);
-    #/* In relative frequency unit */
-    Sa_nu = Sa_d * pow(2.*np.pi*f/gwtools.c, 2);
-    Spm = Sa_nu;
-    return Spm;
-def SopLISAProposal(f):
-    #/* Optical Metrology System noise */
-    noise_Soms_d = np.power((10e-12), 2); #/* m^2/Hz */
-    #/* In displacement */
-    Soms_d = noise_Soms_d * (1. + np.power(2.e-3/f, 4));
-    #/* In relative frequency unit */
-    Soms_nu = Soms_d * np.power(2.*np.pi*f/gwtools.c, 2);
-    Sop = Soms_nu;
-    return Sop;
-
 def SpmLISA(f, variant='LISAproposal'):
     if variant=='LISAproposal':
         return SpmLISAProposal(f)
     elif variant=='LISA2017':
         return SpmLISA2017(f)
+    elif variant=='LISA2010':
+        return SpmLISA2010(f)
     elif variant=='LISASciRDv1':
         return SpmLISASciRDv1(f)
     else:
@@ -141,6 +139,8 @@ def SopLISA(f, variant='LISAproposal'):
         return SopLISAProposal(f)
     elif variant=='LISA2017':
         return SopLISA2017(f)
+    elif variant=='LISA2010':
+        return SopLISA2010(f)
     elif variant=='LISASciRDv1':
         return SopLISASciRDv1(f)
     else:
