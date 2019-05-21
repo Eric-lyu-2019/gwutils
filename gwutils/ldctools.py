@@ -262,8 +262,8 @@ def LISAComputeSNR_TDIAET(wfTDI, df=None, cumul=False, npts=10000, variant='LISA
 #     freqs = np.arange(wfTDI['freq'][0], wfTDI['freq'][-1] + dfval, step=dfval)
     freqs = gwtools.logspace(wfTDI['freq'][0], wfTDI['freq'][-1], npts)
     # Compute rescaled noise, flare convention
-    Sn_AE_flare = SnAXYZ(freqs, L=2.5e9, variant=variant, L=L)
-    Sn_T_flare = SnTXYZ(freqs, L=2.5e9, variant=variant, L=L)
+    Sn_AE_flare = SnAXYZ(freqs, variant=variant, L=L)
+    Sn_T_flare = SnTXYZ(freqs, variant=variant, L=L)
     # factor of 4 larger than in flare conventions as (A,E,T)_LDC = 2 * (A,E,T)_flare
     Sn_AE = 4*Sn_AE_flare
     Sn_T = 4*Sn_T_flare
