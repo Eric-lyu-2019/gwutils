@@ -60,7 +60,8 @@ def SopLISA2017(f):
     return Sop;
 
 #/* Proof mass and optic noises - f in Hz */
-#/* Taken from (4) in McWilliams&al_0911 */
+#/* WARNING: Taken from (4) in McWilliams&al_0911, but there was a typo there */
+#/* WARNING: the term (1. + 1e-8*invf2) in Spm should not come with a sqrt */
 def SpmLISA2010(f):
     invf2 = 1./(f*f);
     #//return 2.5e-48 * invf2 * sqrt(1. + 1e-8*invf2);
@@ -70,7 +71,7 @@ def SpmLISA2010(f):
     invf8=invf2*invf2*invf2*invf2;
     #//Here we add an eyeball approximation based on 4yrs integration with L3LISAReferenceMission looking at a private comm from Neil Cornish 2016.11.12
     WDWDnoise=5000.0/sqrt(1e-21*invf8 + invf2 + 3e28/invf8)*SaccelFF*invf2;
-    return SaccelFF * invf2 * sqrt(1. + 1e-8*invf2) + WDWDnoise;
+    return SaccelFF * invf2 * (1. + 1e-8*invf2) + WDWDnoise;
 def SopLISA2010(f):
     Dop=2.0e-11; #//Optical path noise in m/rtHz (Standard LISA)
     SopFF=Dop*Dop*4.0*np.pi*np.pi/gwtools.c/gwtools.c; #//f^2 coeff for OP frac-freq noise PSD.  Yields 1.76e-37 for Dop=2e-11.

@@ -46,6 +46,7 @@ yr = 31557600e0 # Julian year, 365.25*86400
 # Additional numerical values as copied from the C code for LISA
 au = 1.4959787066e11
 yrsid = 3.15581497635e7 # Sideral year as found on http://hpiers.obspm.fr/eop-pc/models/constants.html
+day = 86400. # NOT sidereal day - 24 hrs in seconds
 Omega = 1.99098659277e-7 # Orbital pulsation: 2pi/year - use sidereal year as found on http://hpiers.obspm.fr/eop-pc/models/constants.html
 # L_SI = 5.0e9 # Arm length of the detector (in m): (Standard LISA)
 L = 2.5e9 # Arm length of the detector (in m): (L3 reference LISA)
