@@ -147,9 +147,93 @@ def SopLISA(f, variant='LISAproposal'):
     else:
         raise ValueError('Unrecognized variant %s' % variant)
 
+# Directly copied from LDC tdi.py
+# NOTE: rescaled by factoring out 2*sin2pifL^2
+# NOTE: computed for the LDC convention
+def SGal(fr, pars):
+    """
+    TODO To be described
+    """
+    #{{{
+    Amp = pars[0]
+    alpha = pars[1]
+    sl1 = pars[2]
+    kn = pars[3]
+    sl2 = pars[4]
+    Sgal = Amp*np.exp(-(fr**alpha)*sl1)*(fr**(-7./3.))*0.5*(1.0 + np.tanh(-(fr-kn)*sl2) )
+
+    return(Sgal)
+def GalConf(fr, Tobs):
+    """
+    TODO To be described
+    """
+    #{{{
+    # Tobs should be in sec.
+    day = 86400.0
+    month = day*30.5
+    year = 365.25*24.0*3600.0
+
+    #Sgal_1d = 2.2e-44*np.exp(-(fr**1.2)*0.9e3)*(fr**(-7./3.))*0.5*(1.0 + np.tanh(-(fr-1.4e-2)*0.7e2))
+    #Sgal_3m = 2.2e-44*np.exp(-(fr**1.2)*1.7e3)*(fr**(-7./3.))*0.5*(1.0 + np.tanh(-(fr-4.8e-3)*5.4e2))
+    #Sgal_1y = 2.2e-44*np.exp(-(fr**1.2)*2.2e3)*(fr**(-7./3.))*0.5*(1.0 + np.tanh(-(fr-3.1e-3)*1.3e3))
+    #Sgal_2y = 2.2e-44*np.exp(-(fr**1.2)*2.2e3)*(fr**(-7./3.))*0.5*(1.0 + np.tanh(-(fr-2.3e-3)*1.8e3))
+    #Sgal_4y = 2.2e-44*np.exp(-(fr**1.2)*2.9e3)*(fr**(-7./3.))*0.5*(1.0 + np.tanh(-(fr-2.0e-3)*1.9e3))
+
+    Amp = 3.26651613e-44
+    alpha = 1.18300266e+00
+
+    Xobs = [1.0*day, 3.0*month, 6.0*month, 1.0*year, 2.0*year, 4.0*year, 10.0*year]
+    Slope1 = [9.41315118e+02,   1.36887568e+03, 1.68729474e+03, 1.76327234e+03, 2.32678814e+03, 3.01430978e+03,\
+            3.74970124e+03]
+    knee = [ 1.15120924e-02, 4.01884128e-03, 3.47302482e-03, 2.77606177e-03, 2.41178384e-03, 2.09278117e-03,\
+            1.57362626e-03]
+    Slope2 = [1.03239773e+02, 1.03351646e+03, 1.62204855e+03, 1.68631844e+03, 2.06821665e+03, 2.95774596e+03,\
+            3.15199454e+03]
+
+    #Slope1 = [9.0e2, 1.7e3, 2.2e3, 2.2e3, 2.9e3]
+    #knee = [1.4e-2, 4.8e-3, 3.1e-3, 2.3e-3, 2.0e-3]
+    #Slope2 = [0.7e2, 5.4e2, 1.3e3, 1.8e3, 1.9e3]
+
+    Tmax = 10.0*year
+    if (Tobs > Tmax):
+        raise ValueError('I do not do extrapolation, Tobs > Tmax: %g, %g' % (Tobs, Tmax))
+
+    # Interpolate
+    tck1 = ip.splrep(Xobs, Slope1, s=0, k=1)
+    tck2 = ip.splrep(Xobs, knee, s=0, k=1)
+    tck3 = ip.splrep(Xobs, Slope2, s=0, k=1)
+    sl1 = ip.splev(Tobs, tck1, der=0)
+    kn = ip.splev(Tobs, tck2, der=0)
+    sl2 = ip.splev(Tobs, tck3, der=0)
+    #print "interpolated values: slope1, knee, slope2", sl1, kn, sl2
+    Sgal_int = SGal(fr, [Amp, alpha, sl1, kn, sl2])
+
+    return Sgal_int
+def WDconfusionAE(f, duration, variant='LISASciRDv1', L=2.5e9):
+    if not (variant=='LISASciRDv1' or variant=='LISAproposal'):
+        raise ValueError('Only variant=LISAproposal or LISASciRDv1 are supported.')
+    ## WANRNING: WD should be regenrate for SciRD
+    x = 2.0 * np.pi * L / gwtools.c * f
+    t_rescaled = 2.0 * x**2
+    Sg_sens = GalConf(f, duration*gwtools.yr)
+    #t = 4 * x**2 * np.sin(x)**2 * (1.0 if obs == 'X' else 1.5)
+    factorAE = 3./2
+    return factorAE * t_rescaled * Sg_sens
+def WDconfusionAENoRescaling(f, duration, variant='LISASciRDv1', L=2.5e9):
+    if not (variant=='LISASciRDv1' or variant=='LISAproposal'):
+        raise ValueError('Only variant=LISAproposal or LISASciRDv1 are supported.')
+    ## WANRNING: WD should be regenrate for SciRD
+    x = 2.0 * np.pi * L / gwtools.c * f
+    t = 4.0 * x**2 * np.sin(x)**2
+    Sg_sens = GalConf(f, duration*gwtools.yr)
+    #t = 4 * x**2 * np.sin(x)**2 * (1.0 if obs == 'X' else 1.5)
+    factorAE = 3./2
+    return factorAE * t * Sg_sens
+
+# Noise functions in flare conventions
 # NOTE: here variant does not include L like in the C code
 #/* Rescaled by 2*sin2pifL^2 */
-def SnAXYZ(f, L=2.5e9, variant='LISAproposal'):
+def SnAXYZ_flare(f, L=2.5e9, variant='LISAproposal'):
     twopifL = 2.*np.pi*L/gwtools.c*f;
     c2 = np.cos(twopifL);
     c4 = np.cos(2*twopifL);
@@ -157,7 +241,7 @@ def SnAXYZ(f, L=2.5e9, variant='LISAproposal'):
     Sop = SopLISA(f, variant=variant);
     return 2*(3. + 2*c2 + c4)*Spm + (2 + c2)*Sop;
 #/* Rescaled by 2*sin2pifL^2 */
-def SnEXYZ(f, L=2.5e9, variant='LISAproposal'):
+def SnEXYZ_flare(f, L=2.5e9, variant='LISAproposal'):
     twopifL = 2.*np.pi*L/gwtools.c*f;
     c2 = np.cos(twopifL);
     c4 = np.cos(2*twopifL);
@@ -165,7 +249,7 @@ def SnEXYZ(f, L=2.5e9, variant='LISAproposal'):
     Sop = SopLISA(f, variant=variant);
     return 2*(3. + 2*c2 + c4)*Spm + (2 + c2)*Sop;
 #/* Rescaled by 8*sin2pifL^2*sinpifL^2 */
-def SnTXYZ(f, L=2.5e9, variant='LISAproposal'):
+def SnTXYZ_flare(f, L=2.5e9, variant='LISAproposal'):
     pifL = np.pi*L/gwtools.c*f;
     s1 = np.sin(pifL);
     Spm = SpmLISA(f, variant=variant);
@@ -173,7 +257,7 @@ def SnTXYZ(f, L=2.5e9, variant='LISAproposal'):
     return 4*s1*s1*Spm + Sop;
 #/* Noise functions for AET(XYZ) without rescaling */
 #/* Scaling by 2*np.sin2pifL^2 put back */
-def SnAXYZNoRescaling(f, L=2.5e9, variant='LISAproposal'):
+def SnAXYZNoRescaling_flare(f, L=2.5e9, variant='LISAproposal'):
     twopifL = 2.*np.pi*L/gwtools.c*f;
     c2 = np.cos(twopifL);
     c4 = np.cos(2*twopifL);
@@ -182,7 +266,7 @@ def SnAXYZNoRescaling(f, L=2.5e9, variant='LISAproposal'):
     Sop = SopLISA(f, variant=variant);
     return 2*s2*s2 * (2*(3. + 2*c2 + c4)*Spm + (2 + c2)*Sop);
 #/* Scaling by 2*np.sin2pifL^2 put back */
-def SnEXYZNoRescaling(f, L=2.5e9, variant='LISAproposal'):
+def SnEXYZNoRescaling_flare(f, L=2.5e9, variant='LISAproposal'):
     twopifL = 2.*np.pi*L/gwtools.c*f;
     c2 = np.cos(twopifL);
     c4 = np.cos(2*twopifL);
@@ -191,13 +275,47 @@ def SnEXYZNoRescaling(f, L=2.5e9, variant='LISAproposal'):
     Sop = SopLISA(f, variant=variant);
     return 2*s2*s2 * (2*(3. + 2*c2 + c4)*Spm + (2 + c2)*Sop);
 #/* Scaling by 8*np.sin2pifL^2*np.sinpifL^2 put back*/
-def SnTXYZNoRescaling(f, L=2.5e9, variant='LISAproposal'):
+def SnTXYZNoRescaling_flare(f, L=2.5e9, variant='LISAproposal'):
     pifL = np.pi*L/gwtools.c*f;
     s1 = np.sin(pifL);
     s2 = np.sin(2*pifL);
     Spm = SpmLISA(f, variant=variant);
     Sop = SopLISA(f, variant=variant);
     return 8*s1*s1*s2*s2 * (4*s1*s1*Spm + Sop);
+
+# Noise functions in LDC conventions
+# Sn_LDC = 4*Sn_flare
+# Also option to add LDC WD background (note: zero for T channel)
+def SnAXYZ(f, L=2.5e9, variant='LISAproposal', WDbackground=False, WDduration=None):
+    if WDbackground and WDduration is not None:
+        Sn_WD = WDconfusionAE(f, WDduration, variant=variant, L=L)
+    else:
+        Sn_WD = 0.
+    return 4*SnAXYZ_flare(f, L=L, variant=variant) + Sn_WD
+def SnEXYZ(f, L=2.5e9, variant='LISAproposal', WDbackground=False, WDduration=None):
+    if WDbackground and WDduration is not None:
+        Sn_WD = WDconfusionAE(f, WDduration, variant=variant, L=L)
+    else:
+        Sn_WD = 0.
+    return 4*SnEXYZ_flare(f, L=L, variant=variant) + Sn_WD
+def SnTXYZ(f, L=2.5e9, variant='LISAproposal', WDbackground=False, WDduration=None):
+    return 4*SnTXYZ_flare(f, L=L, variant=variant)
+def SnAXYZNoRescaling(f, L=2.5e9, variant='LISAproposal', WDbackground=False, WDduration=None):
+    if WDbackground and WDduration is not None:
+        rescaling = RescalingSnAXYZ(f, L)
+        Sn_WD = rescaling * WDconfusionAE(f, WDduration, variant=variant, L=L)
+    else:
+        Sn_WD = 0.
+    return 4*SnAXYZNoRescaling_flare(f, L=L, variant=variant) + Sn_WD
+def SnEXYZNoRescaling(f, L=2.5e9, variant='LISAproposal', WDbackground=False, WDduration=None):
+    if WDbackground and WDduration is not None:
+        rescaling = RescalingSnEXYZ(f, L)
+        Sn_WD = rescaling * WDconfusionAE(f, WDduration, variant=variant, L=L)
+    else:
+        Sn_WD = 0.
+    return 4*SnEXYZNoRescaling_flare(f, L=L, variant=variant) + Sn_WD
+def SnTXYZNoRescaling(f, L=2.5e9, variant='LISAproposal', WDbackground=False, WDduration=None):
+    return 4*SnTXYZNoRescaling_flare(f, L=L, variant=variant)
 
 # Not from C, written here to access the rescaling conveniently
 def RescalingSnAXYZ(f, L=2.5e9):
@@ -247,7 +365,7 @@ def RescalingTDITXYZ(f, L=2.5e9):
 # If cumul is True, returns arrays of cumulative SNR instead of total value
 # NOTE: to avoid 0/0 situations, wfTDI has to be rescaled, and we use the rescaled version of the noises
 # NOTE: LDC convention for A,E,T assumed -- (A,E,T)_LDC = 2 * (A,E,T)_flare
-def LISAComputeSNR_TDIAET(wfTDI, df=None, cumul=False, npts=10000, variant='LISAproposal', L=2.5e9):
+def LISAComputeSNR_TDIAET(wfTDI, df=None, cumul=False, npts=10000, variant='LISAproposal', L=2.5e9, WDbackground=False, WDduration=None):
     if not wfTDI['TDItag']=='TDIAET':
         raise ValueError('TDItag not supported, must be TDIAET.')
     # If df is not specified, determine it from the Nyquist time, with duration of the signal estimated from tf at the beginning and end of the waveform
@@ -262,12 +380,9 @@ def LISAComputeSNR_TDIAET(wfTDI, df=None, cumul=False, npts=10000, variant='LISA
 #         dfval = downsample*dfval
 #     freqs = np.arange(wfTDI['freq'][0], wfTDI['freq'][-1] + dfval, step=dfval)
     freqs = gwtools.logspace(wfTDI['freq'][0], wfTDI['freq'][-1], npts)
-    # Compute rescaled noise, flare convention
-    Sn_AE_flare = SnAXYZ(freqs, variant=variant, L=L)
-    Sn_T_flare = SnTXYZ(freqs, variant=variant, L=L)
-    # factor of 4 larger than in flare conventions as (A,E,T)_LDC = 2 * (A,E,T)_flare
-    Sn_AE = 4*Sn_AE_flare
-    Sn_T = 4*Sn_T_flare
+    # Compute rescaled noise, LDC convention
+    Sn_AE = SnAXYZ(freqs, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)
+    Sn_T = SnTXYZ(freqs, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)
     # Evaluate TDI channels on the array of frequencies
     tdiA_vals = pyFDresponse.LISAEvaluateTDIFreqGrid(freqs, wfTDI, chan=1)
     tdiE_vals = pyFDresponse.LISAEvaluateTDIFreqGrid(freqs, wfTDI, chan=2)
@@ -290,7 +405,7 @@ def LISAComputeSNR_TDIAET(wfTDI, df=None, cumul=False, npts=10000, variant='LISA
     # Result
     return np.array([np.sqrt(SNR2_A + SNR2_E + SNR2_T), np.sqrt(SNR2_A), np.sqrt(SNR2_E), np.sqrt(SNR2_T)])
 
-def LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9):
+def LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, WDbackground=False, WDduration=None):
     zval = z
     Mval = M
     qval = q
@@ -305,10 +420,10 @@ def LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=5., minf=1
 
     tf = 1./(2*np.pi)*gwtools.spline(wftdi_rescaled['freq'], wftdi_rescaled['phase'])(wftdi_rescaled['freq'], 1)
 
-    return LISAComputeSNR_TDIAET(wftdi_rescaled, df=None, cumul=False, npts=npts, variant=variant, L=L)
+    return LISAComputeSNR_TDIAET(wftdi_rescaled, df=None, cumul=False, npts=npts, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)
 
-def LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9):
-    return LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0, fRef=fRef, npts=npts, variant=variant, L=L)[0]
+def LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, WDbackground=False, WDduration=None):
+    return LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0, fRef=fRef, npts=npts, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)[0]
 
 def draw_random_angles():
     phi = np.random.uniform(low=-np.pi, high=np.pi)
@@ -318,7 +433,7 @@ def draw_random_angles():
     psi = np.random.uniform(low=0., high=np.pi)
     return np.array([phi, inc, lambd, beta, psi])
 
-def LISASNR_AET_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False, L=2.5e9):
+def LISASNR_AET_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False, L=2.5e9, WDbackground=False, WDduration=None):
     SNR_AET_arr = np.zeros((N,4))
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -326,7 +441,7 @@ def LISASNR_AET_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, 
             t0val = np.random.uniform(low=0., high=1.)
         else:
             t0val = t0
-        SNR_AET_arr[i] = LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L)
+        SNR_AET_arr[i] = LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)
     SNR_av = np.mean(SNR_AET_arr[:,0])
     SNR_A_av = np.mean(SNR_AET_arr[:,1])
     SNR_E_av = np.mean(SNR_AET_arr[:,2])
@@ -340,7 +455,7 @@ def LISASNR_AET_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, 
     else:
         return np.array([SNR_av, SNR_A_av, SNR_E_av, SNR_T_av]), np.array([SNR_std, SNR_A_std, SNR_E_std, SNR_T_std])
 
-def LISASNR_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False, L=2.5e9):
+def LISASNR_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', return_std=False, L=2.5e9, WDbackground=False, WDduration=None):
     SNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -348,7 +463,7 @@ def LISASNR_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf
             t0val = np.random.uniform(low=0., high=1.)
         else:
             t0val = t0
-        SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L)
+        SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)
     SNR_av = np.mean(SNR_arr)
     SNR_std = np.std(SNR_arr)
     if not return_std:
@@ -356,7 +471,7 @@ def LISASNR_average_angles(M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf
     else:
         return SNR_av, SNR_std
 
-def LISASNR_AET_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, return_std=False):
+def LISASNR_AET_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, return_std=False, WDbackground=False, WDduration=None):
     SNR_AET_arr = np.zeros((N,4))
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -366,7 +481,7 @@ def LISASNR_AET_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1.
             t0val = np.random.uniform(low=0., high=1.)
         else:
             t0val = t0
-        SNR_AET_arr[i] = LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L)
+        SNR_AET_arr[i] = LISASNR_AET(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)
     SNR_av = np.mean(SNR_AET_arr[:,0])
     SNR_A_av = np.mean(SNR_AET_arr[:,1])
     SNR_E_av = np.mean(SNR_AET_arr[:,2])
@@ -380,7 +495,7 @@ def LISASNR_AET_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1.
     else:
         return np.array([SNR_av, SNR_A_av, SNR_E_av, SNR_T_av]), np.array([SNR_std, SNR_A_std, SNR_E_std, SNR_T_std])
 
-def LISASNR_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, return_std=False):
+def LISASNR_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, return_std=False, WDbackground=False, WDduration=None):
     SNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -390,7 +505,7 @@ def LISASNR_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0
             t0val = np.random.uniform(low=0., high=1.)
         else:
             t0val = t0
-        SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L)
+        SNR_arr[i] = LISASNR(M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)
     SNR_av = np.mean(SNR_arr)
     SNR_std = np.std(SNR_arr)
     if not return_std:
@@ -401,7 +516,7 @@ def LISASNR_average_angles_spin(M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0
 ################################################################################
 # Time to merger
 
-def LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=5., minf=1e-5, maxf=1., t0=0.,  fRef=0., npts=4000, variant='LISAproposal', L=2.5e9):
+def LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=5., minf=1e-5, maxf=1., t0=0.,  fRef=0., npts=4000, variant='LISAproposal', L=2.5e9, WDbackground=False, WDduration=None):
     zval = z
     Mval = M
     qval = q
@@ -416,7 +531,7 @@ def LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, 
 
     tf = 1./(2*np.pi)*gwtools.spline(wftdi_rescaled['freq'], wftdi_rescaled['phase'])(wftdi_rescaled['freq'], 1)
 
-    cumul_SNR = LISAComputeSNR_TDIAET(wftdi_rescaled, df=None, cumul=True, npts=npts, variant=variant, L=L)[0]
+    cumul_SNR = LISAComputeSNR_TDIAET(wftdi_rescaled, df=None, cumul=True, npts=npts, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)[0]
 
     # Cut freq at first max of tf
     if not np.any(np.diff(tf) <= 0):
@@ -441,7 +556,7 @@ def LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, 
 
     return tthreshold
 
-def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, return_std=False, ignore_nan=False):
+def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, return_std=False, ignore_nan=False, WDbackground=False, WDduration=None):
     tSNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -449,7 +564,7 @@ def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=
             t0val = np.random.uniform(low=0., high=1.)
         else:
             t0val = t0
-        tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L)
+        tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)
     if ignore_nan:
         mask = np.logical_not(np.isnan(tSNR_arr))
         tSNR_arr = tSNR_arr[mask]
@@ -462,7 +577,7 @@ def LISAtimetomergerofSNR_average_angles(SNR, M, q, chi1, chi2, z, N=1000, tobs=
     else:
         return tSNR_av, tSNR_std
 
-def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, return_std=False, ignore_nan=False):
+def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., minf=1e-5, maxf=1., t0=0., fRef=0., npts=10000, variant='LISAproposal', L=2.5e9, return_std=False, ignore_nan=False, WDbackground=False, WDduration=None):
     tSNR_arr = np.zeros(N)
     for i in range(N):
         phi, inc, lambd, beta, psi = draw_random_angles()
@@ -472,7 +587,7 @@ def LISAtimetomergerofSNR_average_angles_spin(SNR, M, q, z, N=1000, tobs=5., min
             t0val = np.random.uniform(low=0., high=1.)
         else:
             t0val = t0
-        tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L)
+        tSNR_arr[i] = LISAtimetomergerofSNR(SNR, M, q, chi1, chi2, z, phi, inc, lambd, beta, psi, tobs=tobs, minf=minf, maxf=maxf, t0=t0val, fRef=fRef, npts=npts, variant=variant, L=L, WDbackground=WDbackground, WDduration=WDduration)
     if ignore_nan:
         mask = np.logical_not(np.isnan(tSNR_arr))
         tSNR_arr = tSNR_arr[mask]
