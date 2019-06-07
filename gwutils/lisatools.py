@@ -305,5 +305,5 @@ def func_degen_params_0inc_0phase(d, phi, inc, lambd, beta, psi):
     thetaL_star = np.pi/2. - betaL_star
     d_star = 1./4*np.sqrt(5./np.pi) * 1./(1. + np.tan(thetaL_star/2.)**2)**2 / np.abs(sigma_minus)
     # Polarization, computed here for phi_star = 0
-    psiL_star = gwtools.modpi(-1./2 * np.angle(sigma_minus) + lambdaL_star + np.pi/6 + phi_star) # defined mod pi
+    psiL_star = gwtools.modpi(-1./2 * np.angle(sigma_minus) + lambdaL_star - np.pi/6 + phi_star) # defined mod pi
     return (d_star, phi_star, inc_star, lambdaL_star, betaL_star, psiL_star)
