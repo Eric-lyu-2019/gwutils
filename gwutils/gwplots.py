@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 import gwutils.gwtools as gwtools
+import gwutils.lisatools as lisatools
 import gwutils.corner_covar as corner_covar
 
 
@@ -745,11 +746,11 @@ def convert_post_to_plotformat(post):
 #     return post
 def convert_params_Lframe(x, defLframe='paper', SetphiRefSSBAtfRef=False):
     xc = x.copy()
-    tL = gwtools.functLfromtSSB(x[2], x[6], x[7])
-    phiL = gwtools.funcphiL(x[0], x[1], x[2], x[4], SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
-    lambdaL = gwtools.funclambdaL(x[6], x[7], defLframe=defLframe)
-    betaL = gwtools.funcbetaL(x[6], x[7])
-    psiL = gwtools.funcpsiL(x[6], x[7], x[8])
+    tL = lisatools.functLfromtSSB(x[2], x[6], x[7])
+    phiL = lisatools.funcphiL(x[0], x[1], x[2], x[4], SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
+    lambdaL = lisatools.funclambdaL(x[6], x[7], defLframe=defLframe)
+    betaL = lisatools.funcbetaL(x[6], x[7])
+    psiL = lisatools.funcpsiL(x[6], x[7], x[8])
     xc[2] = tL
     xc[4] = phiL
     xc[6] = lambdaL

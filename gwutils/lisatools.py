@@ -11,7 +11,7 @@ import scipy.interpolate as ip
 from scipy.interpolate import InterpolatedUnivariateSpline as spline
 
 import gwutils.gwtools as gwtools
-from gwutils.gwtools import R, c, Omega
+from gwutils.gwtools import R, c, Omega, msols
 
 
 ################################################################################
@@ -36,7 +36,16 @@ def funcphiL(m1, m2, tSSB, phiSSB, SetphiRefSSBAtfRef=False): # note: mod to [0,
     else:
         MfROMmax22 = 0.14
         fRef = MfROMmax22/((m1 + m2)*msols)
-        return mod2pi(-phiSSB + pi*tSSB*fRef)
+        return gwtools.mod2pi(-phiSSB + pi*tSSB*fRef)
+# Inverse transformation of the phase
+# NOTE: we take tSSB as an argument, not tL - because computing tSSB requires the sky position as well
+def funcphiSSB(m1, m2, tSSB, phiL, SetphiRefSSBAtfRef=False): # note: mod to [0,2pi]
+    if not SetphiRefSSBAtfRef:
+        return -phiL
+    else:
+        MfROMmax22 = 0.14
+        fRef = MfROMmax22/((m1 + m2)*msols)
+        return gwtools.mod2pi(-phiL + pi*tSSB*fRef)
 # NOTE: simple relation between L-frame definitions
 # lambdaL_old = lambdaL_paper - pi/2
 def funclambdaL(lambd, beta, defLframe='paper'):
@@ -290,11 +299,11 @@ def func_degen_params_0inc_0phase(d, phi, inc, lambd, beta, psi):
     inc_star = 0. # we choose to look for face-on point
     phi_star = 0. # we choose to look for zero-phase (exact degen with psi)
     # Sky
-    lambdaL_star = pi/6. - 1./4 * np.angle(r)
+    lambdaL_star = gwtools.mod2pi(pi/6. - 1./4 * np.angle(r))
     betaL_star = pi/2. - 2*np.arctan((np.abs(r))**(1./4))
     # Distance
     thetaL_star = np.pi/2. - betaL_star
     d_star = 1./4*np.sqrt(5./np.pi) * 1./(1. + np.tan(thetaL_star/2.)**2)**2 / np.abs(sigma_minus)
-    # Polarization
-    psiL_star = -1./2 * np.angle(sigma_minus) + lambdaL_star - np.pi/6. # defined mod pi
+    # Polarization, computed here for phi_star = 0
+    psiL_star = gwtools.modpi(-1./2 * np.angle(sigma_minus) + lambdaL_star + np.pi/6 + phi_star) # defined mod pi
     return (d_star, phi_star, inc_star, lambdaL_star, betaL_star, psiL_star)

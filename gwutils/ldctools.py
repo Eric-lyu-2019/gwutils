@@ -124,6 +124,50 @@ def SopLISASciRDv1(f):
     Sop = Soms_nu
     return Sop
 
+# Take 0.1mHz instead of 0.4mHz for the low-f degradation
+def SpmLISASciRDv1_01mHz(f):
+    ### Acceleration noise
+    Sa_a = (3.e-15)**2 # see LISAParameters.py
+    ## In acceleration
+    Sa_a = Sa_a * (1.0 +(0.1e-3/f)**2)*(1.0+(f/8e-3)**4)
+    ## In displacement
+    Sa_d = Sa_a*(2.*np.pi*f)**(-4.)
+    ## In relative frequency unit
+    Sa_nu = Sa_d*(2.0*np.pi*f/gwtools.c)**2
+    Spm = Sa_nu
+    return Spm
+def SopLISASciRDv1_01mHz(f):
+    ### Optical Metrology System
+    Soms_d = (15.e-12)**2 # see LISAParameters.py
+    ## In displacement
+    Soms_d = Soms_d * (1. + (2.e-3/f)**4)
+    ## In relative frequency unit
+    Soms_nu = Soms_d*(2.0*np.pi*f/gwtools.c)**2
+    Sop = Soms_nu
+    return Sop
+
+# Take 0.1mHz instead of 0.4mHz for the low-f degradation
+def SpmLISASciRDv1_lpf11(f):
+    ### Acceleration noise
+    Sa_a = (1.3e-15)**2 # see LISAParameters.py
+    ## In acceleration
+    Sa_a = Sa_a * (1.0 +(0.6e-3/f)**2)*(1.0+(f/8e-3)**4)
+    ## In displacement
+    Sa_d = Sa_a*(2.*np.pi*f)**(-4.)
+    ## In relative frequency unit
+    Sa_nu = Sa_d*(2.0*np.pi*f/gwtools.c)**2
+    Spm = Sa_nu
+    return Spm
+def SopLISASciRDv1_lpf11(f):
+    ### Optical Metrology System
+    Soms_d = (15.e-12)**2 # see LISAParameters.py
+    ## In displacement
+    Soms_d = Soms_d * (1. + (2.e-3/f)**4)
+    ## In relative frequency unit
+    Soms_nu = Soms_d*(2.0*np.pi*f/gwtools.c)**2
+    Sop = Soms_nu
+    return Sop
+
 def SpmLISA(f, variant='LISAproposal'):
     if variant=='LISAproposal':
         return SpmLISAProposal(f)
@@ -133,6 +177,10 @@ def SpmLISA(f, variant='LISAproposal'):
         return SpmLISA2010(f)
     elif variant=='LISASciRDv1':
         return SpmLISASciRDv1(f)
+    elif variant=='LISASciRDv1_01mHz':
+        return SpmLISASciRDv1_01mHz(f)
+    elif variant=='LISASciRDv1_lpf11':
+        return SpmLISASciRDv1_lpf11(f)
     else:
         raise ValueError('Unrecognized variant %s' % variant)
 def SopLISA(f, variant='LISAproposal'):
@@ -144,6 +192,10 @@ def SopLISA(f, variant='LISAproposal'):
         return SopLISA2010(f)
     elif variant=='LISASciRDv1':
         return SopLISASciRDv1(f)
+    elif variant=='LISASciRDv1_01mHz':
+        return SopLISASciRDv1_01mHz(f)
+    elif variant=='LISASciRDv1_lpf11':
+        return SopLISASciRDv1_lpf11(f)
     else:
         raise ValueError('Unrecognized variant %s' % variant)
 
@@ -210,7 +262,7 @@ def GalConf(fr, Tobs):
 
     return Sgal_int
 def WDconfusionAE(f, duration, variant='LISASciRDv1', L=2.5e9):
-    if not (variant=='LISASciRDv1' or variant=='LISAproposal'):
+    if not (variant=='LISASciRDv1' or variant=='LISAproposal' or variant=='LISASciRDv1_01mHz' or variant=='LISASciRDv1_lpf11'):
         raise ValueError('Only variant=LISAproposal or LISASciRDv1 are supported.')
     ## WANRNING: WD should be regenrate for SciRD
     x = 2.0 * np.pi * L / gwtools.c * f
@@ -220,7 +272,7 @@ def WDconfusionAE(f, duration, variant='LISASciRDv1', L=2.5e9):
     factorAE = 3./2
     return factorAE * t_rescaled * Sg_sens
 def WDconfusionAENoRescaling(f, duration, variant='LISASciRDv1', L=2.5e9):
-    if not (variant=='LISASciRDv1' or variant=='LISAproposal'):
+    if not (variant=='LISASciRDv1' or variant=='LISAproposal' or variant=='LISASciRDv1_01mHz' or variant=='LISASciRDv1_lpf11'):
         raise ValueError('Only variant=LISAproposal or LISASciRDv1 are supported.')
     ## WANRNING: WD should be regenrate for SciRD
     x = 2.0 * np.pi * L / gwtools.c * f
