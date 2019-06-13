@@ -258,15 +258,15 @@ def func_sa(params):
     [d, phi, inc, lambd, beta, psi] = params
     Faplus = func_Faplus(lambd, beta)
     Facross = func_Facross(lambd, beta)
-    a22 = 1./4/d * sqrt(5/pi) * cos(inc/2)**4 * exp(2.*1j*(phi-psi)) * 1./2*(Faplus + 1j*Facross)
-    a2m2 = 1./4/d * sqrt(5/pi) * sin(inc/2)**4 * exp(2.*1j*(phi+psi)) * 1./2*(Faplus - 1j*Facross)
+    a22 = 1./4/d * sqrt(5/pi) * cos(inc/2)**4 * exp(2.*1j*(phi-psi)) * (Faplus + 1j*Facross)
+    a2m2 = 1./4/d * sqrt(5/pi) * sin(inc/2)**4 * exp(2.*1j*(phi+psi)) * (Faplus - 1j*Facross)
     return a22 + a2m2
 def func_se(params):
     [d, phi, inc, lambd, beta, psi] = params
     Feplus = func_Feplus(lambd, beta)
     Fecross = func_Fecross(lambd, beta)
-    e22 = 1./4/d * sqrt(5/pi) * cos(inc/2)**4 * exp(2.*1j*(phi-psi)) * 1./2*(Feplus + 1j*Fecross)
-    e2m2 = 1./4/d * sqrt(5/pi) * sin(inc/2)**4 * exp(2.*1j*(phi+psi)) * 1./2*(Feplus - 1j*Fecross)
+    e22 = 1./4/d * sqrt(5/pi) * cos(inc/2)**4 * exp(2.*1j*(phi-psi)) * (Feplus + 1j*Fecross)
+    e2m2 = 1./4/d * sqrt(5/pi) * sin(inc/2)**4 * exp(2.*1j*(phi+psi)) * (Feplus - 1j*Fecross)
     return e22 + e2m2
 def simple_likelihood_22(pars, factor, sainj, seinj):
     return -1./2 * factor * (abs(func_sa(pars) - sainj)**2 + abs(func_se(pars) - seinj)**2)
