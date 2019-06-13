@@ -30,13 +30,20 @@ def functSSBfromtL(tL, lambd, beta):
 # NOTE: phiL != phiL'
 # the two still differ by fRef-dependent terms that require access to the waveform to evaluate
 # NOTE: phiL' only supports fRef set at its default, the maximum 22 frequency covered by the ROM
-def funcphiL(m1, m2, tSSB, phiSSB, SetphiRefSSBAtfRef=False): # note: mod to [0,2pi]
+# NOTE: fliphase=False is to be used when the SSB phase is already 'correct' (phiRef=phi0 entering the Ylm in code updated from pyFDresponse), in which case we do not touch the phase -- using both SetphiRefSSBAtfRef=True and flipphase=False will not really be use, but we allow it
+def funcphiL(m1, m2, tSSB, phiSSB, SetphiRefSSBAtfRef=False, flipphase=True): # note: mod to [0,2pi]
     if not SetphiRefSSBAtfRef:
-        return -phiSSB
+        if flipphase:
+            return -phiSSB
+        else:
+            return phiSSB
     else:
         MfROMmax22 = 0.14
         fRef = MfROMmax22/((m1 + m2)*msols)
-        return gwtools.mod2pi(-phiSSB + pi*tSSB*fRef)
+        if flipphase:
+            return gwtools.mod2pi(-phiSSB + pi*tSSB*fRef)
+        else:
+            return gwtools.mod2pi(phiSSB + pi*tSSB*fRef)
 # Inverse transformation of the phase
 # NOTE: we take tSSB as an argument, not tL - because computing tSSB requires the sky position as well
 def funcphiSSB(m1, m2, tSSB, phiL, SetphiRefSSBAtfRef=False): # note: mod to [0,2pi]
@@ -292,8 +299,8 @@ def func_degen_params_0inc_0phase(d, phi, inc, lambd, beta, psi):
     params = [d, phi, inc, lambd, beta, psi]
     sa = func_sa(params)
     se = func_se(params)
-    sigma_plus = sa + 1j*se
-    sigma_minus = sa - 1j*se
+    sigma_plus = 1./2 * (sa + 1j*se)
+    sigma_minus = 1./2 * (sa - 1j*se)
     r = sigma_plus / sigma_minus
     # Inclination, phase -- by convention
     inc_star = 0. # we choose to look for face-on point

@@ -702,11 +702,11 @@ def plot_wf_Vf(wf, interval=[-400,150], showQNM=False, exportpdf=False, pdffile=
 # Functions to convert ptmcmc-formatted params to the L-frame
 def convert_ptmcmc_params_Lframe(x, defLframe='paper', SetphiRefSSBAtfRef=False):
     xc = x.copy()
-    tL = gwtools.functLfromtSSB(x[4], x[8], x[9])
-    phiL = gwtools.funcphiL(x[2], x[3], x[4], x[6], SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
-    lambdaL = gwtools.funclambdaL(x[8], x[9], defLframe=defLframe)
-    betaL = gwtools.funcbetaL(x[8], x[9])
-    psiL = gwtools.funcpsiL(x[8], x[9], x[10])
+    tL = lisatools.functLfromtSSB(x[4], x[8], x[9])
+    phiL = lisatools.funcphiL(x[2], x[3], x[4], x[6], SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
+    lambdaL = lisatools.funclambdaL(x[8], x[9], defLframe=defLframe)
+    betaL = lisatools.funcbetaL(x[8], x[9])
+    psiL = lisatools.funcpsiL(x[8], x[9], x[10])
     xc[4] = tL
     xc[6] = phiL
     xc[8] = lambdaL
@@ -744,10 +744,10 @@ def convert_post_to_plotformat(post):
 #     tSSBvals = np.array(map(lambda x: functSSBfromtL(x[2], x[6], x[7]), post))
 #     post[:,2] = tSSBvals
 #     return post
-def convert_params_Lframe(x, defLframe='paper', SetphiRefSSBAtfRef=False):
+def convert_params_Lframe(x, defLframe='paper', SetphiRefSSBAtfRef=False, flipphase=True):
     xc = x.copy()
     tL = lisatools.functLfromtSSB(x[2], x[6], x[7])
-    phiL = lisatools.funcphiL(x[0], x[1], x[2], x[4], SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
+    phiL = lisatools.funcphiL(x[0], x[1], x[2], x[4], SetphiRefSSBAtfRef=SetphiRefSSBAtfRef, flipphase=flipphase)
     lambdaL = lisatools.funclambdaL(x[6], x[7], defLframe=defLframe)
     betaL = lisatools.funcbetaL(x[6], x[7])
     psiL = lisatools.funcpsiL(x[6], x[7], x[8])
