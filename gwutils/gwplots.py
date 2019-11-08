@@ -744,21 +744,41 @@ def convert_post_to_plotformat(post):
 #     tSSBvals = np.array(map(lambda x: functSSBfromtL(x[2], x[6], x[7]), post))
 #     post[:,2] = tSSBvals
 #     return post
-def convert_params_Lframe(x, defLframe='paper', SetphiRefSSBAtfRef=False, flipphase=True):
-    xc = x.copy()
-    tL = lisatools.functLfromtSSB(x[2], x[6], x[7])
-    phiL = lisatools.funcphiL(x[0], x[1], x[2], x[4], SetphiRefSSBAtfRef=SetphiRefSSBAtfRef, flipphase=flipphase)
-    lambdaL = lisatools.funclambdaL(x[6], x[7], defLframe=defLframe)
-    betaL = lisatools.funcbetaL(x[6], x[7])
-    psiL = lisatools.funcpsiL(x[6], x[7], x[8])
-    xc[2] = tL
-    xc[4] = phiL
-    xc[6] = lambdaL
-    xc[7] = betaL
-    xc[8] = psiL
-    return xc
-def convert_post_Lframe(posterior, defLframe='paper', SetphiRefSSBAtfRef=False):
-    return np.array(list(map(lambda x: convert_params_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef), posterior)))
+def convert_params_Lframe(params, defLframe='paper', SetphiRefSSBAtfRef=False, flipphase=True, frozenLISA=False, tfrozenLISA=None):
+    tSSB, lambdaSSB, betaSSB, psiSSB = params[[2, 6, 7, 8]]
+    tL, lambdaL, betaL, psiL = lisatools.ConvertSSBframeParamsToLframe(
+        tSSB,
+        lambdaSSB,
+        betaSSB,
+        psiSSB,
+        constellation_ini_phase=0.,
+        frozenLISA=frozenLISA,
+        tfrozenLISA=tfrozenLISA)
+    m1, m2, phiSSB = params[[0,1,4]]
+    phiL = lisatools.funcphiL(m1, m2, tSSB, phiSSB, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef, flipphase=flipphase)
+    params_L = np.copy(params)
+    params_L[[2, 4, 6, 7, 8]] = tL, phiL, lambdaL, betaL, psiL
+    return params_L
+def convert_post_Lframe(posterior, defLframe='paper', SetphiRefSSBAtfRef=False, flipphase=True, frozenLISA=False, tfrozenLISA=None):
+    return np.array(list(map(lambda x: convert_params_Lframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef, flipphase=flipphase, frozenLISA=frozenLISA, tfrozenLISA=tfrozenLISA), posterior)))
+# Function to convert L-frame params to SSB-frame params
+def convert_params_SSBframe(params, SetphiRefSSBAtfRef=False, flipphase=True, frozenLISA=False, tfrozenLISA=None):
+    tL, lambdaL, betaL, psiL = params[[2, 6, 7, 8]]
+    tSSB, lambdaSSB, betaSSB, psiSSB = lisatools.ConvertLframeParamsToSSBframe(
+        tL,
+        lambdaL,
+        betaL,
+        psiL,
+        constellation_ini_phase=0.,
+        frozenLISA=frozenLISA,
+        tfrozenLISA=tfrozenLISA)
+    m1, m2, phiL = params[[0,1,4]]
+    phiSSB = lisatools.funcphiSSB(m1, m2, tSSB, phiL, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef, flipphase=flipphase)
+    params_SSB = np.copy(params)
+    params_SSB[[2, 4, 6, 7, 8]] = tSSB, phiSSB, lambdaSSB, betaSSB, psiSSB
+    return params_SSB
+def convert_post_SSBframe(posterior, defLframe='paper', SetphiRefSSBAtfRef=False, flipphase=True, frozenLISA=False, tfrozenLISA=None):
+    return np.array(list(map(lambda x: convert_params_SSBframe(x, defLframe=defLframe, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef, flipphase=flipphase, frozenLISA=frozenLISA, tfrozenLISA=tfrozenLISA), posterior)))
 
 # Functions to parse a bambi .out file
 # Extract evolution of evidence and acceptance rate with the number of evaluations
@@ -891,7 +911,7 @@ def read_fisher(file):
 # F' = tJ^-1 . F . J^-1
 # C' = (F^-1)' = J . C . tJ
 def convert_covariance_Lframe(params, cov, SetphiRefSSBAtfRef=False):
-    J = gwtools.funcJacobianSSBtoLframe(params, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
+    J = lisatools.funcJacobianSSBtoLframe(params, SetphiRefSSBAtfRef=SetphiRefSSBAtfRef)
     return np.dot(J, np.dot(cov, J.T))
 
 # Compute posterior values for individual posterior samples by multiplying with the prior
@@ -1050,7 +1070,7 @@ def scale_covariance(cov, scales, params):
 # Default levels for contours in 2d histogram - TODO: check the correspondence with 1,2,3sigma
 default_levels = 1.0 - np.exp(-0.5 * np.linspace(1.0, 3.0, num=3) ** 2)
 
-def corner_plot(injparams, posterior, add_posteriors=None, output=False, output_dir=None, output_file=None, histograms=True, fisher=False, cov=None, detector='LISA', params=['m1', 'm2', 'Deltat', 'D', 'phi', 'inc', 'lambda', 'beta', 'pol'], params_range=None, Lframe=False, scales=None, add_truths=None, color="k", add_colors=None, cov_color=None, truth_color="#4682b4", add_truth_colors=None, bins=50, show_histograms=True, quantiles=[0.159, 0.5, 0.841], show_quantiles=True, levels=default_levels, plot_density=True, plot_contours=True, plot_datapoints=True, smooth=None, smooth1d=None, label_kwargs={"fontsize": 16}, show_titles=True, defLframe='paper', SetphiRefSSBAtfRef=False, no_reorder_fisher=False, plot_density_add_post=False):
+def corner_plot(injparams, posterior, add_posteriors=None, output=False, output_dir=None, output_file=None, histograms=True, fisher=False, cov=None, detector='LISA', params=['m1', 'm2', 'Deltat', 'D', 'phi', 'inc', 'lambda', 'beta', 'pol'], params_range=None, Lframe=False, scales=None, add_truths=None, color="k", add_colors=None, cov_color=None, show_truths=True, truth_color="#4682b4", add_truth_colors=None, bins=50, show_histograms=True, quantiles=[0.159, 0.5, 0.841], show_quantiles=True, levels=default_levels, plot_density=True, plot_contours=True, plot_datapoints=True, smooth=None, smooth1d=None, label_kwargs={"fontsize": 16}, show_titles=True, defLframe='paper', SetphiRefSSBAtfRef=False, no_reorder_fisher=False, plot_density_add_post=False):
 
     # If required, transform to parameters in the L-frame
     if Lframe:
@@ -1082,6 +1102,10 @@ def corner_plot(injparams, posterior, add_posteriors=None, output=False, output_
         ordered_add_truths = list(map(lambda x: x[ordered_cols], add_truths))
     else:
         ordered_add_truths = None
+    if show_truths:
+        truths = ordered_injparams
+    else:
+        truths = None
 
     # If required, load Fisher matrix
     # Use no_reorder_fisher e.g. if the input Fisher matrix is given in Mchirp-eta
@@ -1104,7 +1128,7 @@ def corner_plot(injparams, posterior, add_posteriors=None, output=False, output_
     labels = list(map(lambda x: label_dict[x], params))
     fig, axes = corner_covar.corner(ordered_posterior, cov=cov, bins=bins, params_range=params_range, levels=levels,
                                  labels=labels, label_kwargs=label_kwargs, color=color,
-                                 truths=ordered_injparams, add_truths=ordered_add_truths, truth_color=truth_color, add_truth_colors=add_truth_colors, plot_datapoints=plot_datapoints,
+                                 truths=truths, add_truths=ordered_add_truths, truth_color=truth_color, add_truth_colors=add_truth_colors, plot_datapoints=plot_datapoints,
                                  smooth=smooth, smooth1d=smooth1d, show_histograms=show_histograms,
                                  quantiles=quantiles, show_quantiles=show_quantiles, plot_contours=plot_contours,
                                  show_titles=show_titles, plot_density=plot_density)

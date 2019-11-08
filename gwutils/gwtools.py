@@ -123,6 +123,12 @@ def funcNewtoniantoff(m1, m2, f):
 def funcfISCO(M):
     return 1./(M*msols) * 1./pi * (1./6)**(3./2)
 
+# EOBNRv2HMROM: fit of the frequency of the 22 mode at the peak amplitude
+# from table III in the EOBNRv2HM paper, Pan&al 1106
+def funcEOBNRv2HMROM_Mf22peak(q):
+    eta = etaofq(q)
+    return (0.2733 + 0.2316*eta + 0.4463*eta*eta) / (2*np.pi)
+
 # List of (l,m) modes (tuples) for a given value of l
 def listmodesl(l):
     return [(l, l-i) for i in range(2*l+1)]
@@ -149,6 +155,16 @@ def mod2pi(x):
 # Mod pi
 def modpi(x):
     return np.remainder(x, pi)
+# Mod with generic modulus, result symmetric around 0
+def modsym(x, a):
+    rem = np.remainder(x, a)
+    if isinstance(x, np.ndarray) and x.shape is not ():
+        mask = (rem>a/2.)
+        rem[mask] -= a
+    else:
+        if rem>pi:
+            rem -= a
+    return rem
 
 # Unwrapping phase data with a modulus other than 2pi
 def unwrap_mod(p, mod=2*np.pi, axis=-1):
@@ -235,6 +251,15 @@ def trim_zeros_bycol(data, cols, ifallzero_returnvoid=False):
         return data
     else:
         return data[ifirstnonzero:ilastnonzero+1]
+# Restrict data according to given column
+# if x=data[:,col], return data such that interval[0]<=x<=interval[1]
+def restrict_data_bycol(data, interval, col=0):
+    if not interval: # test if interval==[]
+        return data
+    else:
+        x = data[:,col]
+        mask = np.logical_and(interval[0]<=x, x<=interval[1])
+        return data[mask]
 
 # Integration with the discrete trapeze rule
 def integrate_trapeze(data):
@@ -439,7 +464,7 @@ def fft_positivef(timeseries):
     ncol = timeseries.shape[1] - 1
     deltat = timeseries[1,0] - timeseries[0,0]
     deltaf = 1./(n*deltat)
-    #Fast Fourier Transform
+    # Fast Fourier Transform
     frequencies = deltaf*np.arange(n)
     # Input values for the fft - accomodate for the real and complex cases
     if ncol==1:
@@ -448,20 +473,46 @@ def fft_positivef(timeseries):
         vals = timeseries[:,1] + 1j*timeseries[:,2]
     else:
         raise Exception('Incorrect number of columns in array.')
-    #BEWARE: due to the different convention for the sign of Fourier frequencies, we have to reverse the FFT output
-    #Beware also that the FFT treats effectively the initial time as 0
-    #BEWARE: in the reversion of the numpy-convention FFT output, we have to set aside the 0-frequency term
+    # BEWARE: due to the different convention for the sign of Fourier frequencies, we have to reverse the FFT output
+    # Beware also that the FFT treats effectively the initial time as 0
+    # BEWARE: in the reversion of the numpy-convention FFT output, we have to set aside the 0-frequency term
     numpyfftvalues = deltat * np.fft.fft(vals)
     fouriervals = np.concatenate((numpyfftvalues[:1], numpyfftvalues[1:][::-1]))
-    #Discarding information on negative frequencies - if real timeseries in input, no information loss
+    # Discarding information on negative frequencies - if real timeseries in input, no information loss
     fouriervals = fouriervals[:n//2]
     frequencies = frequencies[:n//2]
-    #Coming back to the initial times
+    # Coming back to the initial times
     tshift = timeseries[0,0]
     factorsshifttime = np.exp(1j*2*np.pi*frequencies*tshift)
     fouriervals = np.multiply(fouriervals, factorsshifttime)
     fourierseries = array([frequencies, np.real(fouriervals), np.imag(fouriervals)]).T
     return fourierseries
+# The IFFT function - input format (f, real, imag) expected to be FFT of complex data, assumes negative frequencies are zero (not conjugated as for the FFT of real data)
+# WORK IN PROGRESS
+def ifft_positivef(freqseries, tstart=0.):
+    n = len(freqseries)
+    ncol = freqseries.shape[1] - 1
+    deltat = freqseries[1,0] - freqseries[0,0]
+    deltat = 1./(n*deltaf)
+    # Input values for the ifft - has no reason to bea real, check we have real amnd imag
+    if not ncol==2:
+        raise Exception('Incorrect number of columns in array.')
+    # Zero-pad to next power of 2, then 0-pad by factor 2 for the negative frequencies
+    freqseries_pad = zeropad(freqseries, extend=1)
+    vals = freqseries_pad[:,1] + 1j*freqseries_pad[:,2]
+    # BEWARE: due to the different convention for the sign of Fourier frequencies, we have to reverse the IFFT input
+    # Beware also that the FFT treats effectively the initial time as 0
+    # BEWARE: in the reversion of the numpy-convention IFFT input, we have to set aside the 0-frequency term
+    npad = len(vals)
+    fouriervals_numpyconvention = np.concatenate((vals[:1], vals[1:][::-1]))
+    # Inverse FFT
+    numpyifftvalues = deltaf * np.fft.ifft(vals)
+    # Rebuild time series from positive and negative times
+    tdvals = np.concatenate((numpyifftvalues[:npad//2], numpyifftvalues[npad//2:]))
+    # Rebuild times
+    times = deltat*np.arange(-npad//2, npad//2)
+    timeseries = array([times, np.real(tdvals), np.imag(tdvals)]).T
+    return timeseries
 
 # Function for zero-padding a real array at the end
 # Assumes a constant x-spacing - works with any number of columns

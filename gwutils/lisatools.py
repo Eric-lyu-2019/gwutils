@@ -46,13 +46,19 @@ def funcphiL(m1, m2, tSSB, phiSSB, SetphiRefSSBAtfRef=False, flipphase=True): # 
             return gwtools.mod2pi(phiSSB + pi*tSSB*fRef)
 # Inverse transformation of the phase
 # NOTE: we take tSSB as an argument, not tL - because computing tSSB requires the sky position as well
-def funcphiSSB(m1, m2, tSSB, phiL, SetphiRefSSBAtfRef=False): # note: mod to [0,2pi]
+def funcphiSSB(m1, m2, tSSB, phiL, SetphiRefSSBAtfRef=False, flipphase=True): # note: mod to [0,2pi]
     if not SetphiRefSSBAtfRef:
-        return -phiL
+        if flipphase:
+            return -phiL
+        else:
+            return phiL
     else:
         MfROMmax22 = 0.14
         fRef = MfROMmax22/((m1 + m2)*msols)
-        return gwtools.mod2pi(-phiL + pi*tSSB*fRef)
+        if flipphase:
+            return gwtools.mod2pi(-phiL + pi*tSSB*fRef)
+        else:
+            return gwtools.mod2pi(phiL - pi*tSSB*fRef)
 # NOTE: simple relation between L-frame definitions
 # lambdaL_old = lambdaL_paper - pi/2
 def funclambdaL(lambd, beta, defLframe='paper'):
@@ -74,13 +80,31 @@ def funcpsiL(lambd, beta, psi): # note: mod to [0,pi]
 # NOTE: C function for time duplicate python functions functLfromtSSB and functSSBfromtL
 # Compute Solar System Barycenter time tSSB from retarded time at the center of the LISA constellation tL
 # NOTE: depends on the sky position given in SSB parameters
-def tSSBfromLframe(tL, lambdaSSB, betaSSB, constellation_ini_phase=0.):
-    phase = Omega*tL + constellation_ini_phase - lambdaSSB
+def tSSBfromLframe(tL, lambdaSSB, betaSSB, constellation_ini_phase=0., frozenLISA=False, tfrozenLISA=None):
+    if frozenLISA:
+        if tfrozenLISA is None:
+            alpha = constellation_ini_phase
+        else:
+            alpha = Omega * (tfrozenLISA) + constellation_ini_phase
+    else:
+        alpha = Omega * (tL) + constellation_ini_phase
+    phase = alpha - lambdaSSB
     RoC = R/c
-    return tL + RoC*cos(betaSSB)*cos(phase) - 1./2*Omega*pow(RoC*cos(betaSSB), 2)*sin(2.*phase);
+    if frozenLISA:
+        correction_implicit = 0.
+    else:
+        correction_implicit = -1./2*Omega*pow(RoC*cos(betaSSB), 2)*sin(2.*phase)
+    return tL + RoC*cos(betaSSB)*cos(phase) + correction_implicit;
 # Compute retarded time at the center of the LISA constellation tL from Solar System Barycenter time tSSB */
-def tLfromSSBframe(tSSB, lambdaSSB, betaSSB, constellation_ini_phase=0.):
-    phase = Omega*tSSB + constellation_ini_phase - lambdaSSB
+def tLfromSSBframe(tSSB, lambdaSSB, betaSSB, constellation_ini_phase=0., frozenLISA=False, tfrozenLISA=None):
+    if frozenLISA:
+        if tfrozenLISA is None:
+            alpha = constellation_ini_phase
+        else:
+            alpha = Omega * (tfrozenLISA) + constellation_ini_phase
+    else:
+        alpha = Omega * (tSSB) + constellation_ini_phase
+    phase = alpha - lambdaSSB
     RoC = R/c
     return tSSB - RoC*cos(betaSSB)*cos(phase)
 # Convert L-frame params to SSB-frame params
@@ -90,7 +114,9 @@ def ConvertLframeParamsToSSBframe(
     lambdaL,
     betaL,
     psiL,
-    constellation_ini_phase=0.):
+    constellation_ini_phase=0.,
+    frozenLISA=False,
+    tfrozenLISA=None):
 
     alpha = 0.; cosalpha = 0; sinalpha = 0.; coslambdaL = 0; sinlambdaL = 0.; cosbetaL = 0.; sinbetaL = 0.; cospsiL = 0.; sinpsiL = 0.;
     coszeta = cos(pi/3.)
@@ -104,14 +130,21 @@ def ConvertLframeParamsToSSBframe(
     lambdaSSB_approx = 0.
     betaSSB_approx = 0.
     # Initially, approximate alpha using tL instead of tSSB - then iterate
+    # NOTE: iteration is not useful when using frozenLISA - will just repeat
     tSSB_approx = tL
     for k in range(3):
-        alpha = Omega * (tSSB_approx) + constellation_ini_phase
+        if frozenLISA:
+            if tfrozenLISA is None:
+                alpha = constellation_ini_phase
+            else:
+                alpha = Omega * (tfrozenLISA) + constellation_ini_phase
+        else:
+            alpha = Omega * (tSSB_approx) + constellation_ini_phase
         cosalpha = cos(alpha)
         sinalpha = sin(alpha)
         lambdaSSB_approx = arctan2(cosalpha*cosalpha*cosbetaL*sinlambdaL -sinalpha*sinbetaL*sinzeta + cosbetaL*coszeta*sinalpha*sinalpha*sinlambdaL -cosalpha*cosbetaL*coslambdaL*sinalpha + cosalpha*cosbetaL*coszeta*coslambdaL*sinalpha, cosbetaL*coslambdaL*sinalpha*sinalpha -cosalpha*sinbetaL*sinzeta + cosalpha*cosalpha*cosbetaL*coszeta*coslambdaL -cosalpha*cosbetaL*sinalpha*sinlambdaL + cosalpha*cosbetaL*coszeta*sinalpha*sinlambdaL)
         betaSSB_approx = arcsin(coszeta*sinbetaL + cosalpha*cosbetaL*coslambdaL*sinzeta + cosbetaL*sinalpha*sinzeta*sinlambdaL)
-        tSSB_approx = tSSBfromLframe(tL, lambdaSSB_approx, betaSSB_approx, constellation_ini_phase=constellation_ini_phase)
+        tSSB_approx = tSSBfromLframe(tL, lambdaSSB_approx, betaSSB_approx, constellation_ini_phase=constellation_ini_phase, frozenLISA=frozenLISA, tfrozenLISA=tfrozenLISA)
     tSSB = tSSB_approx
     lambdaSSB = lambdaSSB_approx
     betaSSB = betaSSB_approx
@@ -125,7 +158,9 @@ def ConvertSSBframeParamsToLframe(
     lambdaSSB,
     betaSSB,
     psiSSB,
-    constellation_ini_phase=0.):
+    constellation_ini_phase=0.,
+    frozenLISA=False,
+    tfrozenLISA=None):
 
     alpha = 0.; cosalpha = 0; sinalpha = 0.; coslambda = 0; sinlambda = 0.; cosbeta = 0.; sinbeta = 0.; cospsi = 0.; sinpsi = 0.;
     coszeta = cos(pi/3.)
@@ -136,10 +171,16 @@ def ConvertSSBframeParamsToLframe(
     sinbeta = sin(betaSSB)
     cospsi = cos(psiSSB)
     sinpsi = sin(psiSSB)
-    alpha = Omega * tSSB + constellation_ini_phase
+    if frozenLISA:
+        if tfrozenLISA is None:
+            alpha = constellation_ini_phase
+        else:
+            alpha = Omega * (tfrozenLISA) + constellation_ini_phase
+    else:
+        alpha = Omega * (tSSB) + constellation_ini_phase
     cosalpha = cos(alpha)
     sinalpha = sin(alpha)
-    tL = tLfromSSBframe(tSSB, lambdaSSB, betaSSB, constellation_ini_phase=constellation_ini_phase)
+    tL = tLfromSSBframe(tSSB, lambdaSSB, betaSSB, constellation_ini_phase=constellation_ini_phase, frozenLISA=frozenLISA, tfrozenLISA=tfrozenLISA)
     lambdaL = arctan2(cosalpha*cosalpha*cosbeta*sinlambda + sinalpha*sinbeta*sinzeta + cosbeta*coszeta*sinalpha*sinalpha*sinlambda -cosalpha*cosbeta*coslambda*sinalpha + cosalpha*cosbeta*coszeta*coslambda*sinalpha, cosalpha*sinbeta*sinzeta + cosbeta*coslambda*sinalpha*sinalpha + cosalpha*cosalpha*cosbeta*coszeta*coslambda -cosalpha*cosbeta*sinalpha*sinlambda + cosalpha*cosbeta*coszeta*sinalpha*sinlambda)
     betaL = arcsin(coszeta*sinbeta -cosalpha*cosbeta*coslambda*sinzeta -cosbeta*sinalpha*sinzeta*sinlambda)
     psiL = gwtools.modpi(psiSSB + arctan2(coslambda*sinalpha*sinzeta -cosalpha*sinzeta*sinlambda, cosbeta*coszeta + cosalpha*coslambda*sinbeta*sinzeta + sinalpha*sinbeta*sinzeta*sinlambda))
@@ -289,12 +330,16 @@ def func_degen_sky(inc, lambd, beta, psi):
     sigma_plus = sa + 1j*se
     sigma_minus = sa - 1j*se
     r = sigma_plus / sigma_minus
-    lambdaL_star = pi/6. - 1./4 * np.angle(r)
+    lambdaL_star = gwtools.mod2pi(pi/6. - 1./4 * np.angle(r))
     betaL_star = pi/2. - 2*np.arctan((np.abs(r))**(1./4))
+    # Resolve the pi/2 degeneracy in lambdaL_star by picking the closest to lambdaL
+    lambdaL_star = lambdaL_star + ((lambd - lambdaL_star) - gwtools.modsym(lambd - lambdaL_star, np.pi/2))
     return (lambdaL_star, betaL_star)
 # Degenerate parameters - see PE paper
 # Looks for building degenerate point at 0 inclination and 0 phase
 # Gives value of all [d, phi, inc, lambd, beta, psi]
+# NOTE: phi=0 might not work with previous waveform conventions where it did not
+# have its purely extrinsic meaning
 def func_degen_params_0inc_0phase(d, phi, inc, lambd, beta, psi):
     params = [d, phi, inc, lambd, beta, psi]
     sa = func_sa(params)
@@ -308,9 +353,38 @@ def func_degen_params_0inc_0phase(d, phi, inc, lambd, beta, psi):
     # Sky
     lambdaL_star = gwtools.mod2pi(pi/6. - 1./4 * np.angle(r))
     betaL_star = pi/2. - 2*np.arctan((np.abs(r))**(1./4))
+    # Resolve the pi/2 degeneracy in lambdaL_star by picking the closest to lambdaL
+    lambdaL_star = lambdaL_star + ((lambd - lambdaL_star) - gwtools.modsym(lambd - lambdaL_star, np.pi/2))
     # Distance
     thetaL_star = np.pi/2. - betaL_star
     d_star = 1./4*np.sqrt(5./np.pi) * 1./(1. + np.tan(thetaL_star/2.)**2)**2 / np.abs(sigma_minus)
-    # Polarization, computed here for phi_star = 0
+    # Polarization, for generic phi_star although here we have phi_star = 0
+    psiL_star = gwtools.modpi(-1./2 * np.angle(sigma_minus) + lambdaL_star - np.pi/6 + phi_star) # defined mod pi
+    return (d_star, phi_star, inc_star, lambdaL_star, betaL_star, psiL_star)
+# Looks for building degenerate point at 0 inclination
+# Gives value of all [d, phi, inc, lambd, beta, psi]
+# NOTE: phi=0 might not work with previous waveform conventions where it did not
+# have its purely extrinsic meaning
+# So if phi_star is None (by default), keep the original value
+def func_degen_params_0inc(d, phi, inc, lambd, beta, psi, phi_star=None):
+    params = [d, phi, inc, lambd, beta, psi]
+    sa = func_sa(params)
+    se = func_se(params)
+    sigma_plus = 1./2 * (sa + 1j*se)
+    sigma_minus = 1./2 * (sa - 1j*se)
+    r = sigma_plus / sigma_minus
+    # Inclination, phase -- by convention
+    inc_star = 0. # we choose to look for face-on point
+    if phi_star is None:
+        phi_star = phi # by default, just keep the same value of the phase
+    # Sky
+    lambdaL_star = gwtools.mod2pi(pi/6. - 1./4 * np.angle(r))
+    betaL_star = pi/2. - 2*np.arctan((np.abs(r))**(1./4))
+    # Resolve the pi/2 degeneracy in lambdaL_star by picking the closest to lambdaL
+    lambdaL_star = lambdaL_star + ((lambd - lambdaL_star) - gwtools.modsym(lambd - lambdaL_star, np.pi/2))
+    # Distance
+    thetaL_star = np.pi/2. - betaL_star
+    d_star = 1./4*np.sqrt(5./np.pi) * 1./(1. + np.tan(thetaL_star/2.)**2)**2 / np.abs(sigma_minus)
+    # Polarization, for generic phi_star although here we have phi_star = 0
     psiL_star = gwtools.modpi(-1./2 * np.angle(sigma_minus) + lambdaL_star - np.pi/6 + phi_star) # defined mod pi
     return (d_star, phi_star, inc_star, lambdaL_star, betaL_star, psiL_star)

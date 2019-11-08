@@ -432,6 +432,8 @@ def corner(xs, bins=20, params_range=None, weights=None, cov=None, color="k",
                     # ax.plot(elxs,elys,color='r')
                     #
                     #center
+                    if truths is None:
+                        raise ValueError('Error: truths is None but is required to plot Fisher ellipses.')
                     cx = truths[j] # need to add checking for availability of truths?
                     cy = truths[i]
                     N_thetas = 60
